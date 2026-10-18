@@ -71,8 +71,8 @@ def get_main_stylesheet():
     #sidebar {{
         background-color: {c['bg_dark']};
         border-right: 1px solid {c['border']};
-        min-width: 220px;
-        max-width: 220px;
+        min-width: 240px;
+        max-width: 240px;
     }}
 
     #sidebarTitle {{

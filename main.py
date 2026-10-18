@@ -56,9 +56,13 @@ def main():
 
     # Set application icon globally
     from PySide6.QtGui import QFont, QIcon
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_icon.png")
-    if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    ico_path = os.path.join(base_dir, "app_icon.ico")
+    png_path = os.path.join(base_dir, "app_icon.png")
+    if os.path.exists(ico_path):
+        app.setWindowIcon(QIcon(ico_path))
+    elif os.path.exists(png_path):
+        app.setWindowIcon(QIcon(png_path))
 
     # Set default font
     font = QFont("Segoe UI", 10)

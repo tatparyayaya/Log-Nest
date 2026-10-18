@@ -30,10 +30,10 @@ def _get_app_icon():
     """Load application icon from file or fallback to generated icon."""
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     for path in [
-        os.path.join(base_dir, "app_icon.png"),
         os.path.join(base_dir, "app_icon.ico"),
-        "app_icon.png",
+        os.path.join(base_dir, "app_icon.png"),
         "app_icon.ico",
+        "app_icon.png",
     ]:
         if os.path.exists(path):
             return QIcon(path)
@@ -75,6 +75,7 @@ class MainWindow(QMainWindow):
         # App icon
         self._app_icon = _get_app_icon()
         self.setWindowIcon(self._app_icon)
+        self._apply_native_windows_icon()
 
         # Apply theme
         self.setStyleSheet(get_main_stylesheet())
@@ -95,6 +96,41 @@ class MainWindow(QMainWindow):
         self._start_monitors_timer.timeout.connect(self._start_monitors)
         self._start_monitors_timer.start(500)
 
+    def _apply_native_windows_icon(self):
+        """Ensure the native Windows window and taskbar icons use exact system metric resolutions."""
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            ico_path = os.path.join(base_dir, "app_icon.ico")
+            if not os.path.exists(ico_path):
+                ico_path = "app_icon.ico"
+            if not os.path.exists(ico_path):
+                return
+
+            hwnd = int(self.winId())
+            user32 = ctypes.windll.user32
+            LR_LOADFROMFILE = 0x00000010
+            IMAGE_ICON = 1
+            WM_SETICON = 0x0080
+            ICON_SMALL = 0
+            ICON_BIG = 1
+
+            cx_sm = user32.GetSystemMetrics(49)  # SM_CXSMICON
+            cy_sm = user32.GetSystemMetrics(50)  # SM_CYSMICON
+            cx_lg = user32.GetSystemMetrics(11)  # SM_CXICON
+            cy_lg = user32.GetSystemMetrics(12)  # SM_CYICON
+
+            h_small = user32.LoadImageW(None, os.path.abspath(ico_path), IMAGE_ICON, cx_sm, cy_sm, LR_LOADFROMFILE)
+            h_big = user32.LoadImageW(None, os.path.abspath(ico_path), IMAGE_ICON, cx_lg, cy_lg, LR_LOADFROMFILE)
+
+            if h_small:
+                user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, h_small)
+            if h_big:
+                user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, h_big)
+        except Exception as e:
+            logger.debug(f"Could not apply native Windows icon: {e}")
 
     def _setup_ui(self):
         """Build the main window UI with sidebar navigation."""
@@ -115,7 +151,7 @@ class MainWindow(QMainWindow):
         # Logo / Title Header
         header_widget = QWidget()
         header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(16, 20, 16, 12)
+        header_layout.setContentsMargins(14, 18, 14, 14)
         header_layout.setSpacing(12)
 
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -125,8 +161,9 @@ class MainWindow(QMainWindow):
 
         if os.path.exists(logo_path):
             logo_label = QLabel()
-            logo_pix = QPixmap(logo_path).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_pix = QPixmap(logo_path).scaled(58, 58, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             logo_label.setPixmap(logo_pix)
+            logo_label.setFixedSize(58, 58)
             logo_label.setStyleSheet("border: none; background: transparent;")
             header_layout.addWidget(logo_label)
 
@@ -137,15 +174,15 @@ class MainWindow(QMainWindow):
         title_label = QLabel("LOG NEST")
         title_label.setObjectName("sidebarTitle")
         title_label.setStyleSheet(
-            f"font-size: 16px; font-weight: 800; color: {COLORS['text_primary']}; "
-            f"letter-spacing: 1.5px; border: none; background: transparent;"
+            f"font-size: 17px; font-weight: 800; color: {COLORS['text_primary']}; "
+            f"letter-spacing: 1.2px; border: none; background: transparent;"
         )
         title_vbox.addWidget(title_label)
 
         subtitle = QLabel("Activity Tracker")
         subtitle.setObjectName("sidebarSubtitle")
         subtitle.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 11px; "
+            f"color: {COLORS['text_muted']}; font-size: 11px; font-weight: 500; "
             f"border: none; background: transparent;"
         )
         title_vbox.addWidget(subtitle)

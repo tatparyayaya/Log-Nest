@@ -278,8 +278,9 @@ class SettingsPage(QWidget):
 
         if os.path.exists(logo_path):
             about_logo = QLabel()
-            about_pix = QPixmap(logo_path).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            about_pix = QPixmap(logo_path).scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             about_logo.setPixmap(about_pix)
+            about_logo.setFixedSize(72, 72)
             about_logo.setStyleSheet("border: none; background: transparent;")
             about_header.addWidget(about_logo)
 
