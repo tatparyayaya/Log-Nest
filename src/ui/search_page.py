@@ -79,10 +79,10 @@ class SearchPage(QWidget):
         search_btn = QPushButton("Search")
         search_btn.setProperty("class", "primary")
         search_btn.setStyleSheet(
-            f"QPushButton {{ font-size: 14px; padding: 14px 28px; "
+            f"QPushButton {{ font-size: 13px; padding: 12px 24px; "
             f"background-color: {COLORS['accent_primary']}; color: white; "
-            f"border: none; border-radius: 10px; font-weight: 600; }}"
-            f"QPushButton:hover {{ background-color: #7B73FF; }}"
+            f"border: none; border-radius: 6px; font-weight: 600; }}"
+            f"QPushButton:hover {{ background-color: #1D4ED8; }}"
         )
         search_btn.clicked.connect(self._do_search)
         input_row.addWidget(search_btn)

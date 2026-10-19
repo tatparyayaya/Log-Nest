@@ -36,29 +36,29 @@ class DashboardPage(QWidget):
     def _setup_ui(self):
         """Build the dashboard UI with segmented view switcher."""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(16, 16, 16, 16)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(18, 14, 18, 14)
+        main_layout.setSpacing(10)
 
         # ─── Navigation Header with View Switcher ────────────────
         header = QHBoxLayout()
-        header.setSpacing(16)
+        header.setSpacing(12)
 
-        # Segmented view switcher: [ 🌿 Digital Wellbeing ] [ 📊 System Activity ]
+        # Segmented view switcher: [ Digital Wellbeing ] [ System Activity ]
         switcher_frame = QFrame()
         switcher_frame.setStyleSheet(
-            f"background-color: {COLORS['bg_medium']}; border: 1px solid {COLORS['border']}; "
-            f"border-radius: 8px; padding: 2px;"
+            f"background-color: {COLORS['bg_dark']}; border: 1px solid {COLORS['border']}; "
+            f"border-radius: 6px; padding: 2px;"
         )
         switcher_layout = QHBoxLayout(switcher_frame)
         switcher_layout.setContentsMargins(2, 2, 2, 2)
-        switcher_layout.setSpacing(4)
+        switcher_layout.setSpacing(2)
 
-        self.btn_tab_wellbeing = QPushButton("🌿  Digital Wellbeing")
+        self.btn_tab_wellbeing = QPushButton("Digital Wellbeing")
         self.btn_tab_wellbeing.setCursor(Qt.PointingHandCursor)
         self.btn_tab_wellbeing.clicked.connect(lambda: self._switch_view(0))
         switcher_layout.addWidget(self.btn_tab_wellbeing)
 
-        self.btn_tab_activity = QPushButton("📊  System Activity")
+        self.btn_tab_activity = QPushButton("System Activity")
         self.btn_tab_activity.setCursor(Qt.PointingHandCursor)
         self.btn_tab_activity.clicked.connect(lambda: self._switch_view(1))
         switcher_layout.addWidget(self.btn_tab_activity)
@@ -66,15 +66,15 @@ class DashboardPage(QWidget):
         header.addWidget(switcher_frame)
         header.addStretch()
 
-        # Live indicator
+        # Live indicator (clean, non-flashy)
         live_container = QHBoxLayout()
-        live_container.setSpacing(6)
-        dot = PulsingDot(COLORS["accent_secondary"])
+        live_container.setSpacing(5)
+        dot = PulsingDot(COLORS["accent_secondary"], size=7)
         live_container.addWidget(dot)
-        live_label = QLabel("LIVE PC SYNC")
+        live_label = QLabel("LIVE SYNC")
         live_label.setStyleSheet(
-            f"color: {COLORS['accent_secondary']}; font-size: 11px; "
-            f"font-weight: bold; letter-spacing: 1.5px;"
+            f"color: {COLORS['text_muted']}; font-size: 10px; "
+            f"font-weight: 700; letter-spacing: 0.5px;"
         )
         live_container.addWidget(live_label)
 
@@ -98,14 +98,14 @@ class DashboardPage(QWidget):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(20)
+        scroll_layout.setSpacing(12)
 
-        # ─── Stats Cards ────────────────────────────────────────
+        # ─── Stats Cards (Compact 4 columns) ─────────────────────
         stats_grid = QGridLayout()
-        stats_grid.setSpacing(16)
+        stats_grid.setSpacing(10)
 
         self.stat_total = StatCard(
-            "📊", "Total Events (24h)", "0",
+            "▪", "Total Events (24h)", "0",
             COLORS["accent_primary"]
         )
         self.stat_processes = StatCard(
@@ -117,7 +117,7 @@ class DashboardPage(QWidget):
             COLORS["accent_blue"]
         )
         self.stat_errors = StatCard(
-            "⚠️", "Errors & Crashes", "0",
+            "⚠", "Errors & Crashes", "0",
             COLORS["severity_error"]
         )
 
@@ -133,15 +133,15 @@ class DashboardPage(QWidget):
         chart_frame.setProperty("class", "card")
         chart_frame.setStyleSheet(
             f"QFrame {{ background-color: {COLORS['bg_card']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 12px; }}"
+            f"border: 1px solid {COLORS['border']}; border-radius: 8px; }}"
         )
         chart_layout = QVBoxLayout(chart_frame)
-        chart_layout.setContentsMargins(20, 20, 20, 20)
-        chart_layout.setSpacing(12)
+        chart_layout.setContentsMargins(14, 12, 14, 12)
+        chart_layout.setSpacing(8)
 
-        chart_title = QLabel("📈  Activity (Last 24 Hours)")
+        chart_title = QLabel("Activity (Last 24 Hours)")
         chart_title.setStyleSheet(
-            f"font-size: 16px; font-weight: 600; "
+            f"font-size: 13px; font-weight: 600; "
             f"color: {COLORS['text_primary']}; border: none;"
         )
         chart_layout.addWidget(chart_title)
@@ -235,12 +235,12 @@ class DashboardPage(QWidget):
 
         active_btn_style = (
             f"QPushButton {{ background-color: {COLORS['accent_primary']}; color: white; "
-            f"border: none; border-radius: 6px; padding: 6px 16px; font-weight: 700; font-size: 13px; }}"
+            f"border: 1px solid {COLORS['accent_primary']}; border-radius: 4px; padding: 4px 12px; font-weight: 600; font-size: 12px; }}"
         )
         inactive_btn_style = (
-            f"QPushButton {{ background-color: transparent; color: {COLORS['text_secondary']}; "
-            f"border: none; border-radius: 6px; padding: 6px 16px; font-weight: 500; font-size: 13px; }} "
-            f"QPushButton:hover {{ color: {COLORS['text_primary']}; background-color: {COLORS['bg_lighter']}; }}"
+            f"QPushButton {{ background-color: transparent; color: {COLORS['text_muted']}; "
+            f"border: none; border-radius: 4px; padding: 4px 12px; font-weight: 500; font-size: 12px; }} "
+            f"QPushButton:hover {{ color: {COLORS['text_primary']}; background-color: {COLORS['bg_medium']}; }}"
         )
 
         if idx == 0:

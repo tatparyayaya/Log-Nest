@@ -324,10 +324,10 @@ class SettingsPage(QWidget):
         save_btn = QPushButton("💾  Save Settings")
         save_btn.setProperty("class", "primary")
         save_btn.setStyleSheet(
-            f"QPushButton {{ font-size: 14px; padding: 12px 32px; "
+            f"QPushButton {{ font-size: 13px; padding: 10px 28px; "
             f"background-color: {COLORS['accent_primary']}; color: white; "
-            f"border: none; border-radius: 10px; font-weight: 600; }}"
-            f"QPushButton:hover {{ background-color: #7B73FF; }}"
+            f"border: none; border-radius: 6px; font-weight: 600; }}"
+            f"QPushButton:hover {{ background-color: #1D4ED8; }}"
         )
         save_btn.clicked.connect(self._save_settings)
         save_row.addWidget(save_btn)
@@ -345,7 +345,7 @@ class SettingsPage(QWidget):
             f"QGroupBox {{ "
             f"  background-color: {COLORS['bg_card']}; "
             f"  border: 1px solid {COLORS['border']}; "
-            f"  border-radius: 12px; "
+            f"  border-radius: 8px; "
             f"  margin-top: 20px; "
             f"  padding: 24px 20px 20px 20px; "
             f"  font-size: 15px; "

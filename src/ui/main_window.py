@@ -41,7 +41,7 @@ def _get_app_icon():
     return QIcon(_create_colored_icon())
 
 
-def _create_colored_icon(color_hex="#6C63FF", size=64):
+def _create_colored_icon(color_hex="#2563EB", size=64):
     """Create a simple colored icon pixmap for the app fallback."""
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor("transparent"))
@@ -156,8 +156,8 @@ class MainWindow(QMainWindow):
         # Logo / Title Header
         header_widget = QWidget()
         header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(14, 18, 14, 14)
-        header_layout.setSpacing(12)
+        header_layout.setContentsMargins(14, 14, 14, 12)
+        header_layout.setSpacing(10)
 
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         logo_path = os.path.join(base_dir, "app_icon.png")
@@ -166,21 +166,21 @@ class MainWindow(QMainWindow):
 
         if os.path.exists(logo_path):
             logo_label = QLabel()
-            logo_pix = QPixmap(logo_path).scaled(58, 58, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_pix = QPixmap(logo_path).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             logo_label.setPixmap(logo_pix)
-            logo_label.setFixedSize(58, 58)
+            logo_label.setFixedSize(40, 40)
             logo_label.setStyleSheet("border: none; background: transparent;")
             header_layout.addWidget(logo_label)
 
         title_vbox = QVBoxLayout()
         title_vbox.setContentsMargins(0, 0, 0, 0)
-        title_vbox.setSpacing(2)
+        title_vbox.setSpacing(1)
 
         title_label = QLabel("LOG NEST")
         title_label.setObjectName("sidebarTitle")
         title_label.setStyleSheet(
-            f"font-size: 17px; font-weight: 800; color: {COLORS['text_primary']}; "
-            f"letter-spacing: 1.2px; border: none; background: transparent;"
+            f"font-size: 15px; font-weight: 700; color: {COLORS['text_primary']}; "
+            f"letter-spacing: 0.6px; border: none; background: transparent;"
         )
         title_vbox.addWidget(title_label)
 
@@ -201,11 +201,11 @@ class MainWindow(QMainWindow):
         sep.setFrameShape(QFrame.HLine)
         sep.setStyleSheet(
             f"background-color: {COLORS['border']}; max-height: 1px; "
-            f"margin: 0 16px;"
+            f"margin: 0 12px;"
         )
         sidebar_layout.addWidget(sep)
 
-        sidebar_layout.addSpacing(12)
+        sidebar_layout.addSpacing(8)
 
         # Navigation buttons
         self._nav_buttons = []
@@ -229,20 +229,20 @@ class MainWindow(QMainWindow):
         # Status indicator at bottom of sidebar
         status_frame = QFrame()
         status_frame.setStyleSheet(
-            f"background-color: {COLORS['bg_medium']}; "
+            f"background-color: {COLORS['bg_dark']}; "
             f"border-top: 1px solid {COLORS['border']}; border-radius: 0;"
         )
         status_layout = QHBoxLayout(status_frame)
-        status_layout.setContentsMargins(16, 12, 16, 12)
-        status_layout.setSpacing(8)
+        status_layout.setContentsMargins(14, 10, 14, 10)
+        status_layout.setSpacing(6)
 
-        self._status_dot = PulsingDot(COLORS["accent_secondary"], size=8)
+        self._status_dot = PulsingDot(COLORS["accent_secondary"], size=7)
         status_layout.addWidget(self._status_dot)
 
-        self._status_label = QLabel("Monitoring...")
+        self._status_label = QLabel("Monitoring active")
         self._status_label.setStyleSheet(
-            f"color: {COLORS['accent_secondary']}; font-size: 11px; "
-            f"font-weight: 600; border: none;"
+            f"color: {COLORS['text_muted']}; font-size: 11px; "
+            f"font-weight: 500; border: none;"
         )
         status_layout.addWidget(self._status_label)
         status_layout.addStretch()
