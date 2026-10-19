@@ -125,7 +125,7 @@ class ProcessMonitor(QThread):
 
         # Update process census for memory/subprocess counting
         all_procs: Dict[int, Dict[str, Any]] = {}
-        for proc in psutil.process_iter(["pid", "name", "exe", "cmdline", "ppid", "memory_info"]):
+        for proc in psutil.process_iter(["pid", "name", "exe", "ppid"]):
             try:
                 info = proc.info
                 pid = info["pid"]
@@ -168,7 +168,7 @@ class ProcessMonitor(QThread):
                     description += f"\nExecutable: {exe_path}"
 
                 event_metadata = {
-                    "app_id": aid,
+                    "app_id": app_info.app_id,
                     "app_name": app_name,
                     "main_pid": app_data["main_pid"],
                     "executable": exe_path,
@@ -197,7 +197,7 @@ class ProcessMonitor(QThread):
 
                     try:
                         db_session_id = self.db.create_app_session(
-                            app_id=aid,
+                            app_id=app_info.app_id,
                             app_name=app_name,
                             executable=exe_path,
                             main_pid=app_data["main_pid"],
@@ -213,7 +213,7 @@ class ProcessMonitor(QThread):
 
                 session = {
                     "key": aid,
-                    "app_id": aid,
+                    "app_id": app_info.app_id,
                     "display_name": app_name,
                     "category": app_data["category"],
                     "main_pid": app_data["main_pid"],
@@ -275,7 +275,7 @@ class ProcessMonitor(QThread):
                         event_type="app_session",
                         session=session,
                         pid=session["main_pid"],
-                        timestamp=session["start_iso"],
+                        timestamp=end_iso,
                         duration_seconds=duration_seconds,
                         duration_formatted=formatted_duration,
                         closed_dt=end_dt,
@@ -297,7 +297,7 @@ class ProcessMonitor(QThread):
         closed_iso: Optional[str] = None,
         is_update: bool = False,
     ):
-        """Emit or update a single application lifecycle event entry."""
+        """Maintain a single persisted entry for the whole application session."""
         app_name = session["display_name"]
         exe_path = session.get("exe_path", "")
         db_event_id = session.get("db_event_id")
@@ -331,6 +331,7 @@ class ProcessMonitor(QThread):
             "peak_process_count": session.get("peak_process_count", 1),
             "username": session.get("username", ""),
             "opened_at": session.get("start_iso", timestamp),
+            "state": "closed" if closed_dt else "opened",
         }
         if closed_iso:
             metadata["closed_at"] = closed_iso
@@ -338,21 +339,22 @@ class ProcessMonitor(QThread):
             metadata["duration_seconds"] = duration_seconds
             metadata["duration_formatted"] = duration_formatted
 
-        # When closing an application session, update the existing database entry in-place
-        if is_update and db_event_id:
-            try:
-                self.db.update_event(
-                    event_id=db_event_id,
-                    title=title,
-                    description=description,
-                    metadata=metadata,
+        if closed_dt:
+            if db_event_id:
+                self.db.update_event(db_event_id, title=title,
+                                     description=description, metadata=metadata)
+            else:
+                # Apps present at the initial baseline have no open event yet.
+                db_event_id = self.db.insert_event(
+                    event_type=event_type, category="Application", title=title,
+                    description=description, source=app_name, metadata=metadata,
+                    severity="info", timestamp=session["start_iso"],
                 )
-            except Exception as e:
-                logger.warning(f"Failed to update app event in DB: {e}")
+                is_update = False
 
         event = {
             "id": db_event_id,
-            "is_update": is_update,
+            "is_update": bool(closed_dt and is_update),
             "event_type": event_type,
             "category": "Application",
             "source": app_name,

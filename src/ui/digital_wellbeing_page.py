@@ -44,235 +44,108 @@ class DigitalWellbeingPage(QWidget):
         QTimer.singleShot(40, self.refresh_data)
 
     def _setup_ui(self):
+        from src.ui.reference_widgets import ForestHeader, MetricCard, surface, heading, disclosure
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(18, 14, 18, 14)
-        main_layout.setSpacing(12)
-
-        # ─── Top Header: PC Clock & Date Navigation ─────────────
-        header_frame = QFrame()
-        header_frame.setProperty("class", "card")
-        header_frame.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['bg_dark']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 8px; }}"
-        )
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(16)
+        header_frame = ForestHeader()
+        header_frame.setFixedHeight(138)
         header_layout = QHBoxLayout(header_frame)
-        header_layout.setContentsMargins(14, 8, 14, 8)
-        header_layout.setSpacing(12)
-
-        # Left: Title + Sync status
-        title_vbox = QVBoxLayout()
-        title_vbox.setSpacing(1)
-
-        page_title = QLabel("Digital Wellbeing")
-        page_title.setStyleSheet(
-            f"font-size: 16px; font-weight: 700; color: {COLORS['text_primary']}; border: none; background: transparent;"
-        )
-        title_vbox.addWidget(page_title)
-
-        self.sync_badge = QLabel("● Real-time PC Sync")
-        self.sync_badge.setStyleSheet(
-            f"font-size: 11px; color: {COLORS['accent_secondary']}; border: none; background: transparent;"
-        )
-        title_vbox.addWidget(self.sync_badge)
-        header_layout.addLayout(title_vbox)
-
+        header_layout.setContentsMargins(34, 24, 28, 24)
+        title_box = QVBoxLayout()
+        title_box.addWidget(heading("Digital Wellbeing", 30))
+        self.sync_badge = QLabel("●  Real-time PC Sync")
+        self.sync_badge.setStyleSheet("color:#00ce8c;font-size:17px;background:transparent;border:none")
+        title_box.addWidget(self.sync_badge)
+        header_layout.addLayout(title_box)
         header_layout.addStretch()
-
-        # Center/Right: Live PC Clock Display
-        clock_vbox = QVBoxLayout()
-        clock_vbox.setSpacing(0)
-        clock_vbox.setAlignment(Qt.AlignRight)
-
-        now = datetime.now()
-        self.clock_label = QLabel(now.strftime("%I:%M:%S %p"))
-        self.clock_label.setStyleSheet(
-            f"font-size: 16px; font-weight: 700; font-family: 'Segoe UI', monospace; "
-            f"color: {COLORS['text_primary']}; border: none; background: transparent;"
-        )
-        clock_vbox.addWidget(self.clock_label, 0, Qt.AlignRight)
-
-        self.date_label = QLabel(now.strftime("%A, %B %d, %Y"))
-        self.date_label.setStyleSheet(
-            f"font-size: 11px; color: {COLORS['text_muted']}; border: none; background: transparent;"
-        )
-        clock_vbox.addWidget(self.date_label, 0, Qt.AlignRight)
-        header_layout.addLayout(clock_vbox)
-
-        # Date navigation controls: [ ‹ ] [ Today ] [ › ]
-        nav_box = QHBoxLayout()
-        nav_box.setSpacing(4)
-
-        self.btn_prev_day = QPushButton("‹")
-        self.btn_prev_day.setToolTip("Previous Day")
-        self.btn_prev_day.setCursor(Qt.PointingHandCursor)
-        self.btn_prev_day.setStyleSheet(
-            f"QPushButton {{ background-color: {COLORS['bg_medium']}; color: {COLORS['text_primary']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 4px 8px; font-size: 13px; font-weight: bold; }} "
-            f"QPushButton:hover {{ border-color: {COLORS['accent_primary']}; }}"
-        )
-        self.btn_prev_day.clicked.connect(self._prev_day)
-        nav_box.addWidget(self.btn_prev_day)
-
-        self.btn_today = QPushButton("Today")
-        self.btn_today.setCursor(Qt.PointingHandCursor)
-        self.btn_today.setProperty("class", "primary")
-        self.btn_today.setStyleSheet(
-            f"QPushButton {{ background-color: {COLORS['accent_primary']}; color: white; "
-            f"border: 1px solid {COLORS['accent_primary']}; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 600; }}"
-        )
-        self.btn_today.clicked.connect(self._go_today)
-        nav_box.addWidget(self.btn_today)
-
-        self.btn_next_day = QPushButton("›")
-        self.btn_next_day.setToolTip("Next Day")
-        self.btn_next_day.setCursor(Qt.PointingHandCursor)
-        self.btn_next_day.setStyleSheet(
-            f"QPushButton {{ background-color: {COLORS['bg_medium']}; color: {COLORS['text_primary']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 4px 8px; font-size: 13px; font-weight: bold; }} "
-            f"QPushButton:hover {{ border-color: {COLORS['accent_primary']}; }}"
-        )
-        self.btn_next_day.clicked.connect(self._next_day)
-        nav_box.addWidget(self.btn_next_day)
-
-        header_layout.addLayout(nav_box)
+        clock_box = QVBoxLayout()
+        self.clock_label = heading(datetime.now().strftime("%I:%M:%S %p"), 28)
+        self.date_label = QLabel(datetime.now().strftime("%A, %B %d, %Y"))
+        self.date_label.setStyleSheet("color:#91aaca;font-size:15px;background:transparent;border:none")
+        clock_box.addWidget(self.clock_label, 0, Qt.AlignRight)
+        clock_box.addWidget(self.date_label, 0, Qt.AlignRight)
+        header_layout.addLayout(clock_box)
+        for attr, text, callback in [("btn_prev_day", "‹", self._prev_day), ("btn_today", "Today", self._go_today), ("btn_next_day", "›", self._next_day)]:
+            btn = QPushButton(text)
+            btn.setFixedSize(94 if text == "Today" else 48, 48)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet("QPushButton{background:" + ("#155ee4" if text == "Today" else "#192535") + ";color:white;border:1px solid #233247;border-radius:17px;font-size:18px} QPushButton:hover{border-color:#408bff}")
+            btn.clicked.connect(callback)
+            setattr(self, attr, btn)
+            header_layout.addWidget(btn)
         main_layout.addWidget(header_frame)
-
-        # ─── Scroll Area for Content ────────────────────────────
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(12)
-
-        # ─── 1. Compact Stats Cards Row (4 Columns) ─────────────
-        stats_row = QHBoxLayout()
-        stats_row.setSpacing(10)
-
-        self.stat_screen_time = StatCard("⏱", "Screen Time Today", "0 min", COLORS["accent_primary"])
-        self.stat_launches = StatCard("↗", "App Launches Today", "0", COLORS["accent_secondary"])
-        self.stat_active_apps = StatCard("▦", "Apps Used Today", "0", COLORS["accent_blue"])
-        self.stat_limits = StatCard("⚠", "Limits Reached", "0", COLORS["severity_warning"])
-
-        stats_row.addWidget(self.stat_screen_time)
-        stats_row.addWidget(self.stat_launches)
-        stats_row.addWidget(self.stat_active_apps)
-        stats_row.addWidget(self.stat_limits)
-        scroll_layout.addLayout(stats_row)
-
-        # ─── 2. Hero Section: Donut Ring Chart + Live Active Card
-        hero_layout = QHBoxLayout()
-        hero_layout.setSpacing(12)
-
-        # Donut Ring Chart Frame
-        donut_frame = QFrame()
-        donut_frame.setProperty("class", "card")
-        donut_frame.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['bg_card']}; border: 1px solid {COLORS['border']}; "
-            f"border-radius: 8px; }}"
-        )
-        donut_layout = QVBoxLayout(donut_frame)
-        donut_layout.setContentsMargins(14, 12, 14, 12)
-        donut_layout.setSpacing(8)
-
-        donut_title = QLabel("Screen Time Distribution")
-        donut_title.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {COLORS['text_primary']}; border: none;")
-        donut_layout.addWidget(donut_title)
-
-        donut_center_box = QHBoxLayout()
+        scroll.setStyleSheet("QScrollArea{border:none;background:transparent} QScrollArea>QWidget>QWidget{background:transparent}")
+        content = QWidget()
+        column = QVBoxLayout(content)
+        column.setContentsMargins(0,0,0,0)
+        column.setSpacing(16)
+        stats = QHBoxLayout()
+        stats.setSpacing(16)
+        for attr, icon, title, color in [("stat_screen_time","monitor","Screen Time Today","#00baff"),("stat_launches","grid","App Launches Today","#00ce8c"),("stat_active_apps","layers","Apps Used Today","#af55ff"),("stat_limits","warning","Limits Reached","#ffbf21")]:
+            card = MetricCard(icon, title, color)
+            setattr(self, attr, card)
+            stats.addWidget(card, 1)
+        column.addLayout(stats)
+        hero = QHBoxLayout()
+        hero.setSpacing(16)
+        donut = surface()
+        dl = QVBoxLayout(donut)
+        dl.setContentsMargins(28,24,28,24)
+        title_row = QHBoxLayout()
+        title_row.addWidget(heading("Screen Time Distribution",24))
+        title_row.addStretch()
+        more = QPushButton("••• More")
+        more.setFixedSize(82,42)
+        more.setStyleSheet("background:#1a2738;border:1px solid #26364c;border-radius:15px;color:white")
+        title_row.addWidget(more)
+        dl.addLayout(title_row)
         self.ring_chart = WellbeingRingChart()
-        donut_center_box.addWidget(self.ring_chart)
-        donut_layout.addLayout(donut_center_box)
-
-        # Legend pills
+        dl.addWidget(self.ring_chart,1,Qt.AlignCenter)
         self.legend_container = QHBoxLayout()
-        self.legend_container.setSpacing(8)
-        donut_layout.addLayout(self.legend_container)
-
-        hero_layout.addWidget(donut_frame, 3)
-
-        # Live Active Card on right
-        self.live_card = LiveActiveAppCard()
+        self.legend_container.setSpacing(6)
+        dl.addLayout(self.legend_container)
+        hero.addWidget(donut, 8)
+        from src.ui.active_windows import ActiveWindowsCarousel
+        self.live_card = ActiveWindowsCarousel()
         self.live_card.set_limit_requested.connect(self._open_limit_dialog)
-        hero_layout.addWidget(self.live_card, 4)
-
-        scroll_layout.addLayout(hero_layout)
-
-        # ─── 3. Middle Section: App Breakdown + Hourly / Focus ──
-        body_layout = QHBoxLayout()
-        body_layout.setSpacing(12)
-
-        # Left (58%): App Usage List
-        apps_frame = QFrame()
-        apps_frame.setProperty("class", "card")
-        apps_frame.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['bg_card']}; border: 1px solid {COLORS['border']}; "
-            f"border-radius: 8px; }}"
-        )
-        apps_layout = QVBoxLayout(apps_frame)
-        apps_layout.setContentsMargins(14, 12, 14, 12)
-        apps_layout.setSpacing(8)
-
-        apps_header = QHBoxLayout()
-        apps_title = QLabel("Application Usage")
-        apps_title.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {COLORS['text_primary']}; border: none;")
-        apps_header.addWidget(apps_title)
-        apps_header.addStretch()
-
-        self.app_count_label = QLabel("0 apps")
-        self.app_count_label.setStyleSheet(f"font-size: 11px; color: {COLORS['text_muted']}; border: none;")
-        apps_header.addWidget(self.app_count_label)
-        apps_layout.addLayout(apps_header)
-
+        hero.addWidget(self.live_card, 5)
+        column.addLayout(hero,1)
+        bottom = QHBoxLayout()
+        bottom.setSpacing(16)
+        apps_frame = surface()
+        al = QVBoxLayout(apps_frame)
+        al.setContentsMargins(28,18,28,18)
+        self.app_count_label = QLabel("0 apps tracked")
+        self.app_count_label.setStyleSheet("color:#91aaca;font-size:15px;border:none;background:transparent")
         self.apps_scroll = QScrollArea()
         self.apps_scroll.setWidgetResizable(True)
-        self.apps_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.apps_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        self.apps_scroll.setMinimumHeight(280)
+        self.apps_scroll.setStyleSheet("border:none;background:transparent")
         self.apps_container_widget = QWidget()
         self.apps_container = QVBoxLayout(self.apps_container_widget)
-        self.apps_container.setContentsMargins(0, 0, 0, 0)
-        self.apps_container.setSpacing(6)
         self.apps_container.addStretch()
         self.apps_scroll.setWidget(self.apps_container_widget)
-        apps_layout.addWidget(self.apps_scroll)
-
-        body_layout.addWidget(apps_frame, 5)
-
-        # Right (42%): Hourly Chart + Focus Mode
-        side_vbox = QVBoxLayout()
-        side_vbox.setSpacing(12)
-
-        # Hourly Screen Time chart frame
-        hourly_frame = QFrame()
-        hourly_frame.setProperty("class", "card")
-        hourly_frame.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['bg_card']}; border: 1px solid {COLORS['border']}; "
-            f"border-radius: 8px; }}"
-        )
-        hourly_layout = QVBoxLayout(hourly_frame)
-        hourly_layout.setContentsMargins(14, 12, 14, 12)
-        hourly_layout.setSpacing(6)
-
-        hourly_title = QLabel("Hourly Activity (Today)")
-        hourly_title.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {COLORS['text_primary']}; border: none;")
-        hourly_layout.addWidget(hourly_title)
-
+        apps_toggle = disclosure(al,"Application Usage",self.apps_scroll,self.app_count_label)
+        more.clicked.connect(apps_toggle.click)
+        bottom.addWidget(apps_frame,5)
+        hourly_frame = surface()
+        hl = QVBoxLayout(hourly_frame)
+        hl.setContentsMargins(28,18,28,18)
+        details = QWidget()
+        detail_layout = QVBoxLayout(details)
         self.hourly_chart = HourlyScreenTimeChart()
-        hourly_layout.addWidget(self.hourly_chart)
-        side_vbox.addWidget(hourly_frame)
-
-        # Focus Mode widget
+        detail_layout.addWidget(self.hourly_chart)
         self.focus_widget = FocusModeWidget()
-        side_vbox.addWidget(self.focus_widget)
-
-        body_layout.addLayout(side_vbox, 4)
-        scroll_layout.addLayout(body_layout)
-
-        scroll.setWidget(scroll_content)
-        main_layout.addWidget(scroll, 1)
+        detail_layout.addWidget(self.focus_widget)
+        disclosure(hl,"Hourly Activity (Today)",details)
+        bottom.addWidget(hourly_frame,4)
+        column.addLayout(bottom)
+        scroll.setWidget(content)
+        main_layout.addWidget(scroll,1)
 
     @Slot()
     def _on_clock_tick(self):
@@ -285,7 +158,6 @@ class DigitalWellbeingPage(QWidget):
     @Slot(dict)
     def on_active_tick(self, tick_data: Dict[str, Any]):
         """Real-time tick from ScreenTimeMonitor."""
-        self.live_card.update_tick(tick_data)
         if self._is_today:
             tot_sec = tick_data.get("today_total_seconds", 0)
             self.stat_screen_time.set_value(format_screen_time(tot_sec))
@@ -332,6 +204,9 @@ class DigitalWellbeingPage(QWidget):
 
     def _update_donut_legend(self, top_apps: List[Dict[str, Any]], total_sec: float):
         """Update top app legend pills."""
+        if getattr(self, "_rendered_legend", None) == top_apps:
+            return
+        self._rendered_legend = [dict(app) for app in top_apps]
         while self.legend_container.count():
             item = self.legend_container.takeAt(0)
             if item.widget():
@@ -344,19 +219,19 @@ class DigitalWellbeingPage(QWidget):
 
             pill = QFrame()
             pill.setStyleSheet(
-                f"background-color: {COLORS['bg_medium']}; border-radius: 4px; padding: 2px 6px; border: none;"
+                f"background-color: {COLORS['bg_medium']}; border-radius: 20px; padding: 2px 6px; border: none;"
             )
             pill_layout = QHBoxLayout(pill)
-            pill_layout.setContentsMargins(4, 2, 4, 2)
+            pill_layout.setContentsMargins(10, 10, 10, 10)
             pill_layout.setSpacing(4)
 
             dot = QFrame()
-            dot.setFixedSize(6, 6)
-            dot.setStyleSheet(f"background-color: {color}; border-radius: 3px; border: none;")
+            dot.setFixedSize(12, 12)
+            dot.setStyleSheet(f"background-color: {color}; border-radius: 6px; border: none;")
             pill_layout.addWidget(dot)
 
             lbl = QLabel(f"{name}: {dur}")
-            lbl.setStyleSheet(f"font-size: 10px; color: {COLORS['text_secondary']}; border: none;")
+            lbl.setStyleSheet(f"font-size: 13px; color: {COLORS['text_secondary']}; border: none;")
             pill_layout.addWidget(lbl)
 
             self.legend_container.addWidget(pill)
@@ -365,6 +240,9 @@ class DigitalWellbeingPage(QWidget):
 
     def _update_app_rows(self, apps: List[Dict[str, Any]]):
         """Populate the app usage list."""
+        if getattr(self, "_rendered_apps", None) == apps:
+            return
+        self._rendered_apps = [dict(app) for app in apps]
         while self.apps_container.count() > 1:
             item = self.apps_container.takeAt(0)
             if item.widget():
@@ -402,6 +280,7 @@ class DigitalWellbeingPage(QWidget):
         """Switch view to today."""
         self._current_date = datetime.now().strftime("%Y-%m-%d")
         self._is_today = True
+        self.date_label.setText(datetime.now().strftime("%A, %B %d, %Y"))
         self.btn_today.setText("Today")
         self.sync_badge.setText("● Real-time PC Sync")
         self.refresh_data()

@@ -383,6 +383,15 @@ def is_taskbar_window(hwnd: int) -> Tuple[bool, str]:
     """
     user32 = ctypes.windll.user32
     dwmapi = ctypes.windll.dwmapi
+    user32.GetWindow.argtypes = [ctypes.wintypes.HWND, ctypes.wintypes.UINT]
+    user32.GetWindow.restype = ctypes.wintypes.HWND
+    user32.GetWindowLongW.argtypes = [ctypes.wintypes.HWND, ctypes.c_int]
+    user32.IsWindowVisible.argtypes = [ctypes.wintypes.HWND]
+    user32.IsIconic.argtypes = [ctypes.wintypes.HWND]
+    user32.GetWindowRect.argtypes = [ctypes.wintypes.HWND, ctypes.POINTER(ctypes.wintypes.RECT)]
+    user32.GetWindowTextLengthW.argtypes = [ctypes.wintypes.HWND]
+    user32.GetWindowTextW.argtypes = [ctypes.wintypes.HWND, ctypes.wintypes.LPWSTR, ctypes.c_int]
+    dwmapi.DwmGetWindowAttribute.argtypes = [ctypes.wintypes.HWND, ctypes.wintypes.DWORD, ctypes.c_void_p, ctypes.wintypes.DWORD]
 
     if not user32.IsWindowVisible(hwnd):
         return False, ""
@@ -400,7 +409,7 @@ def is_taskbar_window(hwnd: int) -> Tuple[bool, str]:
         return False, ""
 
     owner = user32.GetWindow(hwnd, 4)  # GW_OWNER
-    if owner != 0 and not (ex_style & WS_EX_APPWINDOW):
+    if owner and not (ex_style & WS_EX_APPWINDOW):
         return False, ""
 
     rect = ctypes.wintypes.RECT()
@@ -425,6 +434,9 @@ def is_taskbar_window(hwnd: int) -> Tuple[bool, str]:
 def resolve_window_pid(hwnd: int) -> int:
     """Resolve the real application PID, unwrapping ApplicationFrameHost for UWP apps."""
     user32 = ctypes.windll.user32
+    user32.GetWindowThreadProcessId.argtypes = [ctypes.wintypes.HWND, ctypes.POINTER(ctypes.wintypes.DWORD)]
+    user32.FindWindowExW.argtypes = [ctypes.wintypes.HWND, ctypes.wintypes.HWND, ctypes.wintypes.LPCWSTR, ctypes.wintypes.LPCWSTR]
+    user32.FindWindowExW.restype = ctypes.wintypes.HWND
     pid = ctypes.wintypes.DWORD()
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     try:
@@ -445,6 +457,10 @@ def get_application_user_model_id(pid: int) -> Optional[str]:
     """Retrieve AppUserModelID for a process if available via kernel32."""
     try:
         kernel32 = ctypes.windll.kernel32
+        kernel32.OpenProcess.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.BOOL, ctypes.wintypes.DWORD]
+        kernel32.OpenProcess.restype = ctypes.wintypes.HANDLE
+        kernel32.GetApplicationUserModelId.argtypes = [ctypes.wintypes.HANDLE, ctypes.POINTER(ctypes.wintypes.UINT), ctypes.wintypes.LPWSTR]
+        kernel32.CloseHandle.argtypes = [ctypes.wintypes.HANDLE]
         PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
         h = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
         if h:
@@ -478,22 +494,10 @@ def get_running_taskbar_applications() -> Dict[str, Dict[str, Any]]:
         return True
 
     WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.wintypes.BOOL, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
-    h_desk = None
-    try:
-        h_desk = user32.OpenInputDesktop(0, False, 0x0040 | 0x0001)
-    except Exception:
-        pass
-
-    if h_desk:
-        try:
-            user32.EnumDesktopWindows(h_desk, WNDENUMPROC(enum_cb), 0)
-        finally:
-            user32.CloseDesktop(h_desk)
-    else:
-        try:
-            user32.EnumWindows(WNDENUMPROC(enum_cb), 0)
-        except Exception:
-            pass
+    user32.EnumWindows.argtypes = [WNDENUMPROC, ctypes.wintypes.LPARAM]
+    if not user32.EnumWindows(WNDENUMPROC(enum_cb), 0):
+        # A failed scan is unknown state, not proof that every app closed.
+        raise ctypes.WinError()
 
     apps: Dict[str, Dict[str, Any]] = {}
     for hwnd, pid, title in taskbar_windows:
@@ -501,19 +505,24 @@ def get_running_taskbar_applications() -> Dict[str, Dict[str, Any]]:
             proc = psutil.Process(pid)
             name = proc.name()
             exe = proc.exe()
-            cmdline = proc.cmdline()
+            try:
+                cmdline = proc.cmdline()
+            except psutil.AccessDenied:
+                cmdline = []
             session_id = get_process_session_id(pid)
 
             app_info = resolve_application_info(name, exe, cmdline, session_id)
             if not app_info.is_user_app:
                 continue
 
-            aid = app_info.app_id
             aumid = get_application_user_model_id(pid)
+            # A group is stable across tabs, subprocess churn and window/PID changes.
+            aid = f"{os.path.normcase(os.path.normpath(exe))}|{aumid or app_info.app_id}"
+
 
             if aid not in apps:
                 apps[aid] = {
-                    "app_id": aid,
+                    "app_id": app_info.app_id,
                     "display_name": app_info.display_name,
                     "category": app_info.category,
                     "main_pid": pid,

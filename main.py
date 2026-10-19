@@ -80,7 +80,7 @@ def main():
     # Launch main window
     from src.ui.main_window import MainWindow
     window = MainWindow()
-    window.show()
+    window.showMaximized()
 
     logger.info("LOG NEST started")
     exit_code = app.exec()

@@ -9,12 +9,12 @@ Compact, clean desktop components:
 
 from PySide6.QtWidgets import (
     QFrame, QLabel, QVBoxLayout, QHBoxLayout, QWidget,
-    QPushButton, QSizePolicy
+    QPushButton, QSizePolicy, QScrollArea, QFileIconProvider, QStyle
 )
 from PySide6.QtCore import (
-    Qt, Signal, QSize, QTimer
+    Qt, Signal, QSize, QTimer, QFileInfo, QEvent
 )
-from PySide6.QtGui import QPainter, QColor, QFont, QPen, QBrush
+from PySide6.QtGui import QPainter, QColor, QFont, QPen, QBrush, QIcon, QImage, QPixmap
 
 from src.ui.theme import COLORS, severity_badge_style, category_color
 from src.utils.helpers import (
@@ -86,6 +86,40 @@ class StatCard(QFrame):
         painter.end()
 
 
+from functools import lru_cache
+
+
+def ui_is_presented(widget):
+    """Check the actual host window as well as embedded page visibility."""
+    if not widget.isVisible():
+        return False
+    root = widget.window()
+    proxy = root.graphicsProxyWidget()
+    if proxy is not None and proxy.scene() is not None:
+        return any(view.isVisible() and not view.window().isMinimized()
+                   for view in proxy.scene().views())
+    return not root.isMinimized()
+
+
+@lru_cache(maxsize=128)
+def _application_icon(executable, modified):
+    """Bounded native-icon cache; file modification time invalidates updates."""
+    icon = QFileIconProvider().icon(QFileInfo(executable))
+    try:
+        import win32gui
+        large, small = win32gui.ExtractIconEx(executable, 0)
+        try:
+            handles = large or small
+            if handles:
+                image = QImage.fromHICON(handles[0])
+                if not image.isNull(): icon = QIcon(QPixmap.fromImage(image))
+        finally:
+            for handle in large + small: win32gui.DestroyIcon(handle)
+    except Exception:
+        pass
+    return icon
+
+
 class EventCard(QFrame):
     """Compact card displaying a single event in the timeline."""
 
@@ -98,107 +132,157 @@ class EventCard(QFrame):
         self.setProperty("class", "card")
         self.setCursor(Qt.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setMinimumHeight(58)
+        self.setMinimumHeight(110)
+        self._list_viewport = None
 
         self._setup_ui()
 
     def _setup_ui(self):
-        """Build the compact event card UI."""
+        """Reference timeline row: content left, severity and age right."""
+        self.setObjectName("eventRow")
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setStyleSheet(
+            "QFrame#eventRow{background:#0b1017;border:1px solid #213044;border-radius:12px;padding:0}"
+            "QFrame#eventRow:hover,QFrame#eventRow:focus{background:#1c2b44;border-color:#263a56}"
+        )
+        raw = self.event_data.get("metadata")
+        metadata = raw if isinstance(raw, dict) else (safe_json_loads(raw) or {})
+        application = bool(metadata.get("opened_at")) or self.event_data.get("category") == "Application"
+        accent = "#8064ed" if application else "#60bfda"
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(10)
-
-        # Category color bar
-        cat = self.event_data.get("category", "")
-        cat_color = category_color(cat)
-
-        color_bar = QFrame()
-        color_bar.setFixedWidth(3)
-        color_bar.setStyleSheet(
-            f"background-color: {cat_color}; border-radius: 1px; border: none;"
-        )
-        layout.addWidget(color_bar)
-
-        # Icon
-        icon_text = get_event_icon(self.event_data.get("event_type", ""))
-        icon_label = QLabel(icon_text)
-        icon_label.setFixedWidth(24)
-        icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setStyleSheet(
-            f"font-size: 14px; color: {cat_color}; background: transparent; border: none;"
-        )
-        layout.addWidget(icon_label)
-
-        # Content
-        content_layout = QVBoxLayout()
-        content_layout.setSpacing(2)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Title row
-        title_row = QHBoxLayout()
-        title_row.setSpacing(8)
-
-        title_label = QLabel(self.event_data.get("title", "Unknown Event"))
-        title_label.setStyleSheet(
-            f"font-size: 13px; font-weight: 600; color: {COLORS['text_primary']}; "
-            f"background: transparent; border: none;"
-        )
-        title_label.setWordWrap(True)
-        title_row.addWidget(title_label, 1)
-
-        # Severity badge
+        layout.setContentsMargins(30,24,30,24)
+        layout.setSpacing(18)
+        bar = QFrame()
+        bar.setFixedWidth(4)
+        bar.setStyleSheet(f"background:{accent};border:none;border-radius:2px")
+        layout.addWidget(bar)
+        executable = metadata.get("executable") or metadata.get("exe_path")
+        file = QFileInfo(executable) if executable else QFileInfo()
+        icon = _application_icon(file.absoluteFilePath(), file.lastModified().toMSecsSinceEpoch()) if file.isFile() else QIcon()
         severity = self.event_data.get("severity", "info")
-        sev_label = QLabel(severity.upper())
-        sev_label.setStyleSheet(severity_badge_style(severity))
-        sev_label.setFixedHeight(20)
-        title_row.addWidget(sev_label)
-
-        # Duration badge if present in metadata
-        metadata = safe_json_loads(self.event_data.get("metadata")) or {}
-        if metadata.get("duration_formatted"):
-            dur_label = QLabel(metadata["duration_formatted"])
-            dur_label.setStyleSheet(
-                f"background-color: {COLORS['bg_medium']}; color: {COLORS['accent_secondary']}; "
-                f"border: 1px solid {COLORS['border_light']}; border-radius: 4px; "
-                f"padding: 1px 6px; font-size: 10px; font-weight: 600;"
-            )
-            title_row.addWidget(dur_label)
-
-        content_layout.addLayout(title_row)
-
-        # Subtitle: time and source
-        sub_row = QHBoxLayout()
-        sub_row.setSpacing(8)
-
-        ts = self.event_data.get("timestamp", "")
-        time_label = QLabel(relative_time(ts))
-        time_label.setStyleSheet(
-            f"font-size: 11px; color: {COLORS['text_muted']}; border: none; background: transparent;"
-        )
-        sub_row.addWidget(time_label)
-
+        if icon.isNull():
+            native = QStyle.SP_MessageBoxWarning if severity == "warning" else QStyle.SP_MessageBoxCritical if severity in ("error","critical") else QStyle.SP_ComputerIcon
+            icon = self.style().standardIcon(native)
+        self.icon_label = QLabel()
+        self.icon_label.setFixedSize(34,34)
+        self.icon_label.setPixmap(icon.pixmap(28,28))
+        self.icon_label.setAlignment(Qt.AlignCenter)
+        self.icon_label.setStyleSheet("background:transparent;border:none")
+        layout.addWidget(self.icon_label)
+        content = QVBoxLayout()
+        content.setSpacing(7)
+        content.addStretch()
+        def text_label(text,size,color):
+            label = QLabel(text)
+            label.setTextFormat(Qt.PlainText)
+            label.setStyleSheet(f"font-family:Segoe UI;font-size:{size}px;color:{color};background:transparent;border:none")
+            label.setSizePolicy(QSizePolicy.Ignored,QSizePolicy.Preferred)
+            label.setToolTip(text)
+            return label
+        title = text_label(self.event_data.get("title","Unknown Event"),16,"#d7e5f5")
+        content.addWidget(title)
+        description = self.event_data.get("description", "").split("\n")[0]
+        if metadata.get("opened_at"):
+            from datetime import datetime
+            def clock(value):
+                try: return datetime.fromisoformat(value).strftime("%I:%M %p")
+                except (TypeError, ValueError): return str(value or "")
+            description = f"Opened: {clock(metadata['opened_at'])}"
+            description += f"  |  Closed: {clock(metadata['closed_at'])}" if metadata.get('closed_at') else "  |  Running"
+        if description:
+            content.addWidget(text_label(description,13,"#859ab9"))
+        source_row = QHBoxLayout()
+        source_row.setSpacing(7)
         source = self.event_data.get("source", "")
         if source:
-            dot = QLabel("•")
-            dot.setStyleSheet(f"color: {COLORS['text_muted']}; border: none;")
-            sub_row.addWidget(dot)
+            small_icon = QLabel()
+            small_icon.setFixedSize(16,16)
+            small_icon.setPixmap(icon.pixmap(14,14))
+            small_icon.setStyleSheet("background:transparent;border:none")
+            source_row.addWidget(small_icon)
+            source_label = text_label(source,12,"#738aa9")
+            source_label.setSizePolicy(QSizePolicy.Maximum,QSizePolicy.Preferred)
+            source_row.addWidget(source_label)
+        if metadata.get("duration_formatted"):
+            duration = QLabel(str(metadata['duration_formatted']))
+            duration.setStyleSheet("background:#3a642e;color:#c1d4b1;border:none;border-radius:3px;padding:2px 8px;font-size:11px")
+            source_row.addWidget(duration)
+        source_row.addStretch()
+        content.addLayout(source_row)
+        content.addStretch()
+        layout.addLayout(content,1)
+        right = QVBoxLayout()
+        right.setSpacing(14)
+        right.addStretch()
+        badge = QLabel(severity.upper())
+        bg,fg = {"info":("#435e35","#9bc6da"),"warning":("#7f3822","#f4b35f"),"error":("#752d38","#f4a0a7"),"critical":("#752d38","#f4a0a7")}.get(severity,("#435e35","#9bc6da"))
+        badge.setStyleSheet(f"background:{bg};color:{fg};border:none;border-radius:4px;padding:5px 12px;font-size:11px")
+        right.addWidget(badge,0,Qt.AlignRight)
+        right.addStretch()
+        age = QLabel(relative_time(self.event_data.get("timestamp","")))
+        age.setStyleSheet("font-size:12px;color:#8191a9;background:transparent;border:none")
+        self._age_label = age
+        right.addWidget(age,0,Qt.AlignRight)
+        right.addStretch()
+        layout.addLayout(right)
 
-            source_label = QLabel(source)
-            source_label.setStyleSheet(
-                f"font-size: 11px; color: {COLORS['text_secondary']}; border: none; background: transparent;"
-            )
-            sub_row.addWidget(source_label)
+    def refresh_relative_time(self):
+        self._age_label.setText(relative_time(self.event_data.get("timestamp", "")))
 
-        sub_row.addStretch()
-        content_layout.addLayout(sub_row)
+    def showEvent(self, event):
+        super().showEvent(event)
+        ancestor = self.parentWidget()
+        while ancestor is not None and not isinstance(ancestor, QScrollArea):
+            ancestor = ancestor.parentWidget()
+        if ancestor is not None:
+            viewport = ancestor.viewport()
+            if viewport is not self._list_viewport:
+                self._list_viewport = viewport
+                viewport.installEventFilter(self)
+            self._fit_row()
 
-        layout.addLayout(content_layout, 1)
+    def _fit_row(self):
+        if self._list_viewport is not None:
+            layout = self.parentWidget().layout()
+            gap = max(0, layout.spacing()) if layout else 8
+            margins = layout.contentsMargins() if layout else None
+            inset = margins.top() + margins.bottom() if margins else 0
+            self.setFixedHeight(max(110, (self._list_viewport.height() - inset - 3 * gap) // 4))
+
+    def eventFilter(self, watched, event):
+        if watched is self._list_viewport and event.type() == QEvent.Resize:
+            self._fit_row()
+        return super().eventFilter(watched, event)
 
     def mousePressEvent(self, event):
         """Emit clicked signal on card click."""
         if event.button() == Qt.LeftButton:
             self.clicked.emit(self.event_data)
         super().mousePressEvent(event)
+
+
+class TimelineEventCard(EventCard):
+    """Reference styling and four-row sizing confined to the timeline list."""
+
+    def __init__(self, event_data, parent=None):
+        super().__init__(event_data, parent)
+        self.setMinimumHeight(0)
+        raw = event_data.get("metadata")
+        metadata = raw if isinstance(raw, dict) else (safe_json_loads(raw) or {})
+        if metadata.get("opened_at") or event_data.get("category") == "Application":
+            self.setStyleSheet(self.styleSheet().replace("background:#0b1017", "background:#1c2b44"))
+
+    def _fit_row(self):
+        if self._list_viewport is None:
+            return
+        layout = self.parentWidget().layout()
+        gap = max(0, layout.spacing()) if layout else 8
+        margins = layout.contentsMargins() if layout else None
+        inset = margins.top() + margins.bottom() if margins else 0
+        height = max(1, (self._list_viewport.height() - inset - 3 * gap) // 4)
+        self.setFixedHeight(height)
+        padding = min(24, max(8, height // 7))
+        self.layout().setContentsMargins(30, padding, 30, padding)
 
 
 class ActivityChart(QWidget):

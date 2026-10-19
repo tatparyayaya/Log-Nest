@@ -13,6 +13,7 @@ from src.monitors.process_monitor import ProcessMonitor
 from src.monitors.file_monitor import FileMonitor
 from src.monitors.system_event_monitor import SystemEventMonitor
 from src.monitors.screen_time_monitor import ScreenTimeMonitor
+from src.monitors.taskbar_window_monitor import TaskbarWindowMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 class MonitorManager(QObject):
     """Manages and coordinates all monitoring threads."""
 
+    taskbar_windows_tick = Signal(list)
     new_event = Signal(dict)            # Emitted when any event is stored
     monitor_error = Signal(str)         # Emitted on monitor errors
     status_changed = Signal(str)        # Emitted when monitor status changes
@@ -38,6 +40,10 @@ class MonitorManager(QObject):
 
     def _init_monitors(self):
         """Initialize all monitor instances."""
+        self._monitors["taskbar_windows"] = TaskbarWindowMonitor()
+        self._monitors["taskbar_windows"].windows_changed.connect(self.taskbar_windows_tick.emit)
+        self._monitors["taskbar_windows"].error_occurred.connect(self._on_error)
+
         # Process monitor
         self._monitors["process"] = ProcessMonitor(poll_interval=3.0)
         self._monitors["process"].event_detected.connect(self._on_event)

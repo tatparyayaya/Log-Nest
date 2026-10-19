@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QTimer, Slot
 
 from src.database import DatabaseManager
 from src.ui.theme import COLORS
-from src.ui.widgets import StatCard, EventCard, ActivityChart, PulsingDot
+from src.ui.widgets import StatCard, EventCard, ActivityChart, PulsingDot, ui_is_presented
 from src.ui.digital_wellbeing_page import DigitalWellbeingPage
 
 
@@ -27,7 +27,11 @@ class DashboardPage(QWidget):
 
         # Auto-refresh timer
         self._refresh_timer = QTimer(self)
-        self._refresh_timer.timeout.connect(self.refresh_data)
+        self._refresh_timer.timeout.connect(self._refresh_visible)
+        self._event_refresh_timer = QTimer(self)
+        self._event_refresh_timer.setSingleShot(True)
+        self._event_refresh_timer.setInterval(150)
+        self._event_refresh_timer.timeout.connect(self._refresh_visible)
         self._refresh_timer.start(5000)  # Refresh every 5 seconds
 
         # Initial load
@@ -36,8 +40,8 @@ class DashboardPage(QWidget):
     def _setup_ui(self):
         """Build the dashboard UI with segmented view switcher."""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(18, 14, 18, 14)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(24, 18, 26, 26)
+        main_layout.setSpacing(16)
 
         # ─── Navigation Header with View Switcher ────────────────
         header = QHBoxLayout()
@@ -47,7 +51,7 @@ class DashboardPage(QWidget):
         switcher_frame = QFrame()
         switcher_frame.setStyleSheet(
             f"background-color: {COLORS['bg_dark']}; border: 1px solid {COLORS['border']}; "
-            f"border-radius: 6px; padding: 2px;"
+            f"border-radius: 28px; padding: 2px;"
         )
         switcher_layout = QHBoxLayout(switcher_frame)
         switcher_layout.setContentsMargins(2, 2, 2, 2)
@@ -69,11 +73,11 @@ class DashboardPage(QWidget):
         # Live indicator (clean, non-flashy)
         live_container = QHBoxLayout()
         live_container.setSpacing(5)
-        dot = PulsingDot(COLORS["accent_secondary"], size=7)
+        dot = PulsingDot("#00ce8c", size=12)
         live_container.addWidget(dot)
         live_label = QLabel("LIVE SYNC")
         live_label.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 10px; "
+            f"color: {COLORS['text_muted']}; font-size: 15px; "
             f"font-weight: 700; letter-spacing: 0.5px;"
         )
         live_container.addWidget(live_label)
@@ -235,11 +239,11 @@ class DashboardPage(QWidget):
 
         active_btn_style = (
             f"QPushButton {{ background-color: {COLORS['accent_primary']}; color: white; "
-            f"border: 1px solid {COLORS['accent_primary']}; border-radius: 4px; padding: 4px 12px; font-weight: 600; font-size: 12px; }}"
+            f"border: 1px solid {COLORS['accent_primary']}; border-radius: 23px; padding: 13px 22px; font-weight: 600; font-size: 16px; }}"
         )
         inactive_btn_style = (
             f"QPushButton {{ background-color: transparent; color: {COLORS['text_muted']}; "
-            f"border: none; border-radius: 4px; padding: 4px 12px; font-weight: 500; font-size: 12px; }} "
+            f"border: none; border-radius: 23px; padding: 13px 22px; font-weight: 500; font-size: 16px; }} "
             f"QPushButton:hover {{ color: {COLORS['text_primary']}; background-color: {COLORS['bg_medium']}; }}"
         )
 
@@ -288,8 +292,20 @@ class DashboardPage(QWidget):
         except Exception as e:
             pass  # Silently handle refresh errors
 
+    def _refresh_visible(self):
+        if ui_is_presented(self):
+            self.refresh_data()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if hasattr(self, "_refresh_timer"):
+            self.refresh_data()
+
     def _update_categories(self, by_category):
         """Update the category breakdown section."""
+        if getattr(self, "_rendered_categories", None) == by_category:
+            return
+        self._rendered_categories = dict(by_category)
         # Clear existing
         while self.category_container.count():
             item = self.category_container.takeAt(0)
@@ -328,7 +344,7 @@ class DashboardPage(QWidget):
 
             count_label = QLabel(f"{count}  ({pct}%)")
             count_label.setStyleSheet(
-                f"color: {COLORS['text_secondary']}; font-size: 12px; border: none;"
+                f"color: {COLORS['text_secondary']}; font-size: 16px; border: none;"
             )
             label_row.addWidget(count_label)
             row_layout.addLayout(label_row)
@@ -358,13 +374,17 @@ class DashboardPage(QWidget):
 
     def _update_recent_events(self):
         """Update the recent events list."""
+        events = self.db.get_events(limit=15)
+        if getattr(self, "_rendered_recent", None) == events:
+            for card in self.recent_container_widget.findChildren(EventCard):
+                card.refresh_relative_time()
+            return
+        self._rendered_recent = events
         # Clear existing event cards
         while self.recent_container.count() > 1:  # Keep the stretch
             item = self.recent_container.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-
-        events = self.db.get_events(limit=15)
 
         for event in events:
             card = EventCard(event)
@@ -374,5 +394,6 @@ class DashboardPage(QWidget):
 
     def add_live_event(self, event_data):
         """Add a new event to the recent list in real-time."""
-        # Just refresh — simpler and avoids duplicate tracking
-        self.refresh_data()
+        # Coalesce event bursts without delaying the independent tracking threads.
+        if ui_is_presented(self) and not self._event_refresh_timer.isActive():
+            self._event_refresh_timer.start()

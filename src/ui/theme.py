@@ -7,45 +7,45 @@ clean Segoe UI typography, and subtle borders.
 # ─── Color Palette (Dark Graphite & Charcoal) ───────────────────────────────
 COLORS = {
     # Backgrounds - Dark Graphite & Charcoal (Windows Modern Dark)
-    "bg_darkest":     "#18181B",  # Main canvas background
-    "bg_dark":        "#1F1F23",  # Sidebar, dialogs, headers
-    "bg_medium":      "#27272A",  # Inputs, controls, panels
-    "bg_light":       "#303036",  # Elevated interactive surfaces
+    "bg_darkest":     "#0b131c",  # Main canvas background
+    "bg_dark":        "#0e1721",  # Sidebar, dialogs, headers
+    "bg_medium":      "#192535",  # Inputs, controls, panels
+    "bg_light":       "#203047",  # Elevated interactive surfaces
     "bg_lighter":     "#3B3B42",  # Active chips, subtle hover
-    "bg_card":        "#222226",  # Cards (flat, clean, solid)
-    "bg_hover":       "#2B2B30",  # Hover
+    "bg_card":        "#101b27",  # Cards (flat, clean, solid)
+    "bg_hover":       "#1b2b40",  # Hover
 
     # Accent colors - Muted Windows Blue (No excessive purple or neon)
-    "accent_primary":    "#2563EB",  # Professional Desktop Blue
-    "accent_secondary":  "#38BDF8",  # Muted Sky Blue
-    "accent_tertiary":   "#94A3B8",  # Slate
+    "accent_primary":    "#0863f6",  # Professional Desktop Blue
+    "accent_secondary":  "#00bfff",  # Muted Sky Blue
+    "accent_tertiary":   "#9ab1ce",  # Slate
     "accent_blue":       "#60A5FA",  # Soft Blue
     "accent_orange":     "#F59E0B",  # Muted Amber
 
     # Text - Clean Neutral Slate
     "text_primary":   "#F8FAFC",  # Off-white primary text
-    "text_secondary": "#94A3B8",  # Slate gray secondary text
-    "text_muted":     "#64748B",  # Muted metadata
+    "text_secondary": "#9ab1ce",  # Slate gray secondary text
+    "text_muted":     "#89a3c0",  # Muted metadata
     "text_accent":    "#60A5FA",  # Accent label
 
     # Severity - Refined Status Colors
-    "severity_info":     "#38BDF8",
+    "severity_info":     "#00bfff",
     "severity_warning":  "#F59E0B",
     "severity_error":    "#EF4444",
     "severity_critical": "#DC2626",
 
     # Category - Clean Muted Identity
     "cat_application": "#3B82F6",  # Blue
-    "cat_filesystem":  "#10B981",  # Emerald
-    "cat_system":      "#64748B",  # Slate
+    "cat_filesystem":  "#00c98b",  # Emerald
+    "cat_system":      "#89a3c0",  # Slate
     "cat_crash":       "#EF4444",  # Red
 
     # Borders - Subtle, 1px Windows Flat Lines
-    "border":         "#2E2E35",
+    "border":         "#223246",
     "border_light":   "#3F3F46",
 
     # Scrollbar
-    "scrollbar_bg":     "#18181B",
+    "scrollbar_bg":     "#0b131c",
     "scrollbar_handle": "#3F3F46",
     "scrollbar_hover":  "#52525B",
 }
@@ -72,8 +72,8 @@ def get_main_stylesheet():
     #sidebar {{
         background-color: {c['bg_dark']};
         border-right: 1px solid {c['border']};
-        min-width: 220px;
-        max-width: 220px;
+        min-width: 286px;
+        max-width: 286px;
     }}
 
     #sidebarTitle {{
@@ -95,8 +95,8 @@ def get_main_stylesheet():
         background-color: transparent;
         color: {c['text_secondary']};
         border: none;
-        border-radius: 6px;
-        padding: 9px 14px;
+        border-radius: 22px;
+        padding: 17px 23px;
         text-align: left;
         font-size: 13px;
         font-weight: 500;
@@ -112,7 +112,7 @@ def get_main_stylesheet():
         background-color: {c['bg_medium']};
         color: {c['text_primary']};
         border-left: 3px solid {c['accent_primary']};
-        border-radius: 4px;
+        border-radius: 22px;
         font-weight: 600;
     }}
 

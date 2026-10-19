@@ -27,10 +27,10 @@ from src.utils.helpers import format_screen_time
 
 # Professional Muted Palette (Blues, Slate, Soft Emerald, Warm Amber)
 WELLBEING_PALETTE = [
-    "#2563EB",  # Professional Desktop Blue
-    "#38BDF8",  # Muted Sky Blue
-    "#10B981",  # Soft Emerald
-    "#64748B",  # Slate
+    "#0064ff",  # Professional Desktop Blue
+    "#00baff",  # Muted Sky Blue
+    "#00c98b",  # Soft Emerald
+    "#ae50f5",  # Purple
     "#F59E0B",  # Muted Amber
     "#6366F1",  # Indigo
     "#0284C7",  # Deep Sky
@@ -48,8 +48,8 @@ class WellbeingRingChart(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(200, 200)
-        self.setMaximumSize(240, 240)
+        self.setMinimumSize(240, 240)
+        self.setMaximumSize(280, 280)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         self._total_seconds: float = 0.0
@@ -79,7 +79,7 @@ class WellbeingRingChart(QWidget):
         cx = w / 2.0
         cy = h / 2.0
         radius = size / 2.0
-        ring_thickness = 16.0
+        ring_thickness = 25.0
 
         rect = QRectF(cx - radius + ring_thickness / 2.0,
                       cy - radius + ring_thickness / 2.0,
@@ -132,17 +132,17 @@ class WellbeingRingChart(QWidget):
         # Status
         painter.setPen(QColor(COLORS["text_muted"]))
         painter.setFont(QFont("Segoe UI", 9, QFont.Normal))
-        painter.drawText(QRectF(cx - 70, cy - radius * 0.42, 140, 16), Qt.AlignCenter, f"● {self._sync_status}")
+        painter.drawText(QRectF(cx - 100, cy - radius * 0.42, 200, 20), Qt.AlignCenter, f"● {self._sync_status}")
 
         # Big clean screen time value
         painter.setPen(QColor(COLORS["text_primary"]))
-        painter.setFont(QFont("Segoe UI", 20, QFont.Bold))
-        painter.drawText(QRectF(cx - 80, cy - radius * 0.18, 160, 30), Qt.AlignCenter, self._center_title)
+        painter.setFont(QFont("Cambria", 24, QFont.Bold))
+        painter.drawText(QRectF(cx - 108, cy - radius * 0.18, 216, 40), Qt.AlignCenter, self._center_title)
 
         # Subtitle
         painter.setPen(QColor(COLORS["text_secondary"]))
         painter.setFont(QFont("Segoe UI", 10, QFont.Normal))
-        painter.drawText(QRectF(cx - 70, cy + radius * 0.22, 140, 18), Qt.AlignCenter, self._center_subtitle)
+        painter.drawText(QRectF(cx - 100, cy + radius * 0.22, 200, 24), Qt.AlignCenter, self._center_subtitle)
 
         painter.end()
 
@@ -154,10 +154,10 @@ class LiveActiveAppCard(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setProperty("class", "card")
+        self.setProperty("class", "live-card")
         self.setStyleSheet(
             f"QFrame {{ background-color: {COLORS['bg_card']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 8px; }}"
+            f"border: 1px solid {COLORS['border']}; border-radius: 34px; }}"
         )
         self._current_app_id = ""
         self._current_app_name = "Desktop"
@@ -165,18 +165,19 @@ class LiveActiveAppCard(QFrame):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(28, 24, 28, 36)
+        layout.setSpacing(34)
 
         # Header
         header = QHBoxLayout()
         header.setSpacing(6)
 
-        self.pulse_label = QLabel("ACTIVE WINDOW")
+        self.pulse_label = QLabel("Active Window")
         self.pulse_label.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 10px; "
+            f"color: {COLORS['text_muted']}; font-size: 15px; "
             f"font-weight: 700; letter-spacing: 0.5px; border: none; background: transparent;"
         )
+        self.pulse_label.setStyleSheet("font-family:Cambria;font-size:24px;color:#b9cce5;border:none;background:transparent")
         header.addWidget(self.pulse_label)
         header.addStretch()
 
@@ -184,7 +185,7 @@ class LiveActiveAppCard(QFrame):
         self.btn_limit.setCursor(Qt.PointingHandCursor)
         self.btn_limit.setStyleSheet(
             f"QPushButton {{ background-color: {COLORS['bg_medium']}; color: {COLORS['text_secondary']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 3px 8px; font-size: 11px; }} "
+            f"border: 1px solid {COLORS['border']}; border-radius: 16px; padding: 12px 16px; font-size: 15px; }} "
             f"QPushButton:hover {{ color: {COLORS['text_primary']}; border-color: {COLORS['accent_primary']}; }}"
         )
         self.btn_limit.clicked.connect(self._on_limit_click)
@@ -196,11 +197,11 @@ class LiveActiveAppCard(QFrame):
         content_row.setSpacing(10)
 
         self.icon_badge = QLabel("▪")
-        self.icon_badge.setFixedSize(34, 34)
+        self.icon_badge.setFixedSize(72, 72)
         self.icon_badge.setAlignment(Qt.AlignCenter)
         self.icon_badge.setStyleSheet(
             f"background-color: {COLORS['bg_medium']}; border: 1px solid {COLORS['border']}; "
-            f"border-radius: 6px; font-size: 16px; color: {COLORS['accent_primary']};"
+            f"border-radius: 20px; font-size: 16px; color: {COLORS['accent_primary']};"
         )
         content_row.addWidget(self.icon_badge)
 
@@ -209,13 +210,13 @@ class LiveActiveAppCard(QFrame):
 
         self.app_title = QLabel("Desktop")
         self.app_title.setStyleSheet(
-            f"font-size: 15px; font-weight: 600; color: {COLORS['text_primary']}; border: none; background: transparent;"
+            f"font-family:Cambria;font-size:22px; font-weight:600; color: {COLORS['text_primary']}; border: none; background: transparent;"
         )
         info_vbox.addWidget(self.app_title)
 
         self.category_label = QLabel("System")
         self.category_label.setStyleSheet(
-            f"font-size: 11px; color: {COLORS['text_muted']}; border: none; background: transparent;"
+            f"font-size: 15px; color: {COLORS['text_muted']}; border: none; background: transparent;"
         )
         info_vbox.addWidget(self.category_label)
         content_row.addLayout(info_vbox, 1)
@@ -227,14 +228,14 @@ class LiveActiveAppCard(QFrame):
 
         self.stopwatch_label = QLabel("00:00:00")
         self.stopwatch_label.setStyleSheet(
-            f"font-size: 17px; font-weight: 700; font-family: 'Segoe UI', 'Consolas', monospace; "
+            f"font-family:Cambria;font-size:25px; font-weight: 700; font-family: 'Segoe UI', 'Consolas', monospace; "
             f"color: {COLORS['accent_secondary']}; border: none; background: transparent;"
         )
         timer_vbox.addWidget(self.stopwatch_label, 0, Qt.AlignRight)
 
         self.session_sub = QLabel("Current Session")
         self.session_sub.setStyleSheet(
-            f"font-size: 10px; color: {COLORS['text_muted']}; border: none; background: transparent;"
+            f"font-size: 15px; color: {COLORS['text_muted']}; border: none; background: transparent;"
         )
         timer_vbox.addWidget(self.session_sub, 0, Qt.AlignRight)
         content_row.addLayout(timer_vbox)
@@ -244,10 +245,13 @@ class LiveActiveAppCard(QFrame):
         # Cumulative line
         self.cumul_label = QLabel("Today: 0 min")
         self.cumul_label.setStyleSheet(
-            f"font-size: 11px; color: {COLORS['text_muted']}; border-top: 1px solid {COLORS['border']}; "
+            f"font-size: 15px; color: {COLORS['text_muted']}; border-top: 1px solid {COLORS['border']}; "
             f"padding-top: 6px; margin-top: 2px; background: transparent;"
         )
+        self.cumul_label.setMinimumHeight(110)
+        self.cumul_label.setStyleSheet("font-size:15px;color:#91aaca;background:#14202e;border:1px solid #223246;border-radius:25px;padding:18px")
         layout.addWidget(self.cumul_label)
+        layout.addStretch()
 
     def update_tick(self, tick_data: Dict[str, Any]):
         """Update live foreground app details."""
@@ -264,10 +268,10 @@ class LiveActiveAppCard(QFrame):
         if is_idle:
             self.pulse_label.setText("SCREEN TIME PAUSED")
             self.pulse_label.setStyleSheet(
-                f"color: {COLORS['severity_warning']}; font-size: 10px; font-weight: 700; border: none; background: transparent;"
+                f"color: {COLORS['severity_warning']}; font-size: 15px; font-weight: 700; border: none; background: transparent;"
             )
             self.stopwatch_label.setStyleSheet(
-                f"font-size: 17px; font-weight: 700; font-family: 'Segoe UI', monospace; "
+                f"font-family:Cambria;font-size:25px; font-weight: 700; font-family: 'Segoe UI', monospace; "
                 f"color: {COLORS['severity_warning']}; border: none; background: transparent;"
             )
             self.app_title.setText("Idle / Away")
@@ -276,14 +280,15 @@ class LiveActiveAppCard(QFrame):
             self.cumul_label.setText("Tracking resumes on user input")
             self.btn_limit.setVisible(False)
         else:
-            self.pulse_label.setText("ACTIVE WINDOW")
+            self.pulse_label.setText("Active Window")
             self.pulse_label.setStyleSheet(
-                f"color: {COLORS['text_muted']}; font-size: 10px; font-weight: 700; border: none; background: transparent;"
+                f"color: {COLORS['text_muted']}; font-size: 15px; font-weight: 700; border: none; background: transparent;"
             )
             self.stopwatch_label.setStyleSheet(
-                f"font-size: 17px; font-weight: 700; font-family: 'Segoe UI', monospace; "
+                f"font-family:Cambria;font-size:25px; font-weight: 700; font-family: 'Segoe UI', monospace; "
                 f"color: {COLORS['accent_secondary']}; border: none; background: transparent;"
             )
+            self.pulse_label.setStyleSheet("font-family:Cambria;font-size:24px;color:#b9cce5;border:none;background:transparent")
             self.app_title.setText(app_name)
             self.category_label.setText(category)
             self.btn_limit.setVisible(bool(app_id and app_id != "idle"))
@@ -299,6 +304,10 @@ class LiveActiveAppCard(QFrame):
                 "System": "⚙️",
             }
             self.icon_badge.setText(cat_symbols.get(category, "▪"))
+            if "lognest" in app_name.lower().replace(" ", ""):
+                from PySide6.QtGui import QPixmap
+                from src.ui.reference_widgets import ROOT
+                self.icon_badge.setPixmap(QPixmap(str(ROOT / "app_icon.png")).scaled(52,52,Qt.KeepAspectRatio,Qt.SmoothTransformation))
 
             hrs = session_sec // 3600
             mins = (session_sec % 3600) // 60

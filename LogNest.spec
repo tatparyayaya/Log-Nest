@@ -12,6 +12,7 @@ a = Analysis(
     datas=[
         ('app_icon.ico', '.'),
         ('app_icon.png', '.'),
+        ('assets', 'assets'),
     ],
     hiddenimports=[
         'win32evtlog',
@@ -37,6 +38,18 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+
+# Qt uses the ICU and Universal CRT supplied by Windows. Dependency scanning
+# can pick incompatible same-named DLLs from unrelated tools on PATH (for
+# example Poppler's ICU). Never shadow these Windows components in the bundle.
+windows_components = {"icuuc.dll", "icuin.dll", "icu.dll", "ucrtbase.dll"}
+a.binaries = [
+    entry for entry in a.binaries
+    if os.path.basename(entry[0]).lower() not in windows_components
+    and not os.path.basename(entry[0]).lower().startswith(
+        ("api-ms-", "ext-ms-", "icudt")
+    )
+]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, QTimer, QDate, Slot, Signal
 
 from src.database import DatabaseManager
 from src.ui.theme import COLORS, severity_badge_style, category_color
-from src.ui.widgets import EventCard, CategoryBadge
+from src.ui.widgets import TimelineEventCard, CategoryBadge, ui_is_presented
 from src.utils.helpers import (
     format_timestamp_full, safe_json_loads, format_bytes,
     EVENT_TYPE_LABELS, relative_time
@@ -244,9 +244,19 @@ class TimelinePage(QWidget):
 
     def _setup_ui(self):
         """Build the timeline page UI."""
+        self.setObjectName("timelinePage")
+        self.setStyleSheet("""
+            QWidget#timelinePage{background:#0b1017}
+            QWidget#timelinePage QComboBox,QWidget#timelinePage QDateEdit,QWidget#timelinePage QLineEdit{
+                background:#151f2e;border:1px solid #25364e;border-radius:7px;color:#bfd0e6;
+                padding:8px 12px;font-size:13px;min-height:26px}
+            QWidget#timelinePage QCheckBox{color:#d7e5f5;font-size:13px;background:transparent}
+            QWidget#timelinePage QCheckBox::indicator{width:22px;height:22px;border-radius:4px;border:1px solid #7560ed;background:#151f2e}
+            QWidget#timelinePage QCheckBox::indicator:checked{background:#7958ef}
+        """)
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(24, 24, 24, 24)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(14, 14, 14, 14)
+        main_layout.setSpacing(14)
 
         # Header
         header = QHBoxLayout()
@@ -265,7 +275,7 @@ class TimelinePage(QWidget):
         header.addWidget(self.auto_refresh_cb)
 
         refresh_btn = QPushButton("↻ Refresh")
-        refresh_btn.setProperty("class", "primary")
+        refresh_btn.setStyleSheet("background:transparent;border:none;color:#d7e5f5;font-size:13px;padding:6px 12px")
         refresh_btn.clicked.connect(self.load_events)
         header.addWidget(refresh_btn)
 
@@ -274,9 +284,10 @@ class TimelinePage(QWidget):
         # ─── Filter Bar ─────────────────────────────────────────
         filter_frame = QFrame()
         filter_frame.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['bg_card']}; "
+            f"QFrame {{ background-color: #151e2c; "
             f"border: 1px solid {COLORS['border']}; border-radius: 10px; }}"
         )
+        filter_frame.setFixedHeight(86)
         filter_layout = QHBoxLayout(filter_frame)
         filter_layout.setContentsMargins(16, 12, 16, 12)
         filter_layout.setSpacing(12)
@@ -322,6 +333,7 @@ class TimelinePage(QWidget):
         self.date_from = QDateEdit()
         self.date_from.setDate(QDate.currentDate().addDays(-7))
         self.date_from.setCalendarPopup(True)
+        self.date_from.setDisplayFormat("dd-MM-yyyy")
         self.date_from.dateChanged.connect(self.load_events)
         filter_layout.addWidget(self.date_from)
 
@@ -335,6 +347,7 @@ class TimelinePage(QWidget):
         self.date_to = QDateEdit()
         self.date_to.setDate(QDate.currentDate())
         self.date_to.setCalendarPopup(True)
+        self.date_to.setDisplayFormat("dd-MM-yyyy")
         self.date_to.dateChanged.connect(self.load_events)
         filter_layout.addWidget(self.date_to)
 
@@ -342,7 +355,7 @@ class TimelinePage(QWidget):
 
         # Quick filter
         self.quick_search = QLineEdit()
-        self.quick_search.setPlaceholderText("🔍 Quick filter...")
+        self.quick_search.setPlaceholderText("Quick filter...")
         self.quick_search.setMaximumWidth(200)
         self.quick_search.textChanged.connect(self._quick_filter_changed)
         filter_layout.addWidget(self.quick_search)
@@ -361,10 +374,11 @@ class TimelinePage(QWidget):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll_area.setStyleSheet(
-            "QScrollArea { border: none; background: transparent; }"
+            "QScrollArea { border: none; background: #0b1017; } QScrollBar:vertical{width:6px;background:#101927} QScrollBar::handle:vertical{background:#64759b;min-height:30px;border-radius:3px} QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0}"
         )
 
         self.events_widget = QWidget()
+        self.events_widget.setStyleSheet("background:#0b1017")
         self.events_layout = QVBoxLayout(self.events_widget)
         self.events_layout.setContentsMargins(0, 0, 0, 0)
         self.events_layout.setSpacing(8)
@@ -378,6 +392,7 @@ class TimelinePage(QWidget):
         page_layout.setSpacing(12)
 
         self.prev_btn = QPushButton("← Newer")
+        self.prev_btn.setStyleSheet("background:#0b1017;border:1px solid #25364e;border-radius:8px;padding:10px 18px;color:#bfd0e6;font-size:13px")
         self.prev_btn.clicked.connect(self._prev_page)
         self.prev_btn.setEnabled(False)
         page_layout.addWidget(self.prev_btn)
@@ -393,6 +408,7 @@ class TimelinePage(QWidget):
         page_layout.addStretch()
 
         self.next_btn = QPushButton("Older →")
+        self.next_btn.setStyleSheet(self.prev_btn.styleSheet())
         self.next_btn.clicked.connect(self._next_page)
         page_layout.addWidget(self.next_btn)
 
@@ -427,6 +443,13 @@ class TimelinePage(QWidget):
             end_date=end_date,
         )
 
+        signature = (events, self.quick_search.text().lower().strip(), self._current_offset)
+        if getattr(self, "_rendered_events", None) == signature:
+            for card in self.events_widget.findChildren(TimelineEventCard):
+                card.refresh_relative_time()
+            return
+        self._rendered_events = signature
+
         # Clear existing
         while self.events_layout.count() > 1:
             item = self.events_layout.takeAt(0)
@@ -447,7 +470,7 @@ class TimelinePage(QWidget):
                 if quick_text not in searchable:
                     continue
 
-            card = EventCard(event)
+            card = TimelineEventCard(event)
             card.clicked.connect(self._show_event_detail)
             self.events_layout.insertWidget(
                 self.events_layout.count() - 1, card
@@ -493,7 +516,12 @@ class TimelinePage(QWidget):
 
     def _auto_refresh(self):
         """Auto-refresh if on page 1."""
-        if self._auto_refresh_enabled and self._current_offset == 0:
+        if self._auto_refresh_enabled and self._current_offset == 0 and ui_is_presented(self):
+            self._load_page()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if hasattr(self, "_refresh_timer") and self._auto_refresh_enabled and self._current_offset == 0:
             self._load_page()
 
     def _show_event_detail(self, event_data):

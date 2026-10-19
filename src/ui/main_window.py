@@ -70,8 +70,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LOG NEST — Activity Tracker")
-        self.setMinimumSize(1100, 700)
-        self.resize(1280, 800)
+        self.setMinimumSize(960, 540)
+        self.resize(1672, 900)
 
         # App icon
         self._app_icon = _get_app_icon()
@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
 
         # Connect Screen Time & Digital Wellbeing signals
         self.monitor_manager.active_screen_tick.connect(self._dashboard.on_active_tick)
+        self.monitor_manager.taskbar_windows_tick.connect(self._dashboard.wellbeing_page.live_card.set_windows)
         self.monitor_manager.daily_limit_reached.connect(self._on_daily_limit_reached)
 
         # Start monitoring
@@ -140,7 +141,7 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         """Build the main window UI with sidebar navigation."""
         central = QWidget()
-        self.setCentralWidget(central)
+        # Embed only after its layout has been assembled below.
 
         main_layout = QHBoxLayout(central)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -156,7 +157,7 @@ class MainWindow(QMainWindow):
         # Logo / Title Header
         header_widget = QWidget()
         header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(14, 14, 14, 12)
+        header_layout.setContentsMargins(24, 20, 18, 20)
         header_layout.setSpacing(10)
 
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -166,9 +167,9 @@ class MainWindow(QMainWindow):
 
         if os.path.exists(logo_path):
             logo_label = QLabel()
-            logo_pix = QPixmap(logo_path).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_pix = QPixmap(logo_path).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             logo_label.setPixmap(logo_pix)
-            logo_label.setFixedSize(40, 40)
+            logo_label.setFixedSize(64, 64)
             logo_label.setStyleSheet("border: none; background: transparent;")
             header_layout.addWidget(logo_label)
 
@@ -179,7 +180,7 @@ class MainWindow(QMainWindow):
         title_label = QLabel("LOG NEST")
         title_label.setObjectName("sidebarTitle")
         title_label.setStyleSheet(
-            f"font-size: 15px; font-weight: 700; color: {COLORS['text_primary']}; "
+            f"font-size: 26px; font-family: Cambria; font-weight: 700; color: {COLORS['text_primary']}; "
             f"letter-spacing: 0.6px; border: none; background: transparent;"
         )
         title_vbox.addWidget(title_label)
@@ -187,7 +188,7 @@ class MainWindow(QMainWindow):
         subtitle = QLabel("Activity Tracker")
         subtitle.setObjectName("sidebarSubtitle")
         subtitle.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 11px; font-weight: 500; "
+            f"color: {COLORS['text_muted']}; font-size: 16px; font-weight: 500; "
             f"border: none; background: transparent;"
         )
         title_vbox.addWidget(subtitle)
@@ -203,21 +204,32 @@ class MainWindow(QMainWindow):
             f"background-color: {COLORS['border']}; max-height: 1px; "
             f"margin: 0 12px;"
         )
-        sidebar_layout.addWidget(sep)
+        sep.hide()
 
-        sidebar_layout.addSpacing(8)
+        sidebar_layout.addSpacing(18)
 
         # Navigation buttons
         self._nav_buttons = []
         nav_items = [
-            ("📊  Dashboard", 0),
-            ("📋  Timeline", 1),
-            ("🔍  Search", 2),
-            ("⚙️  Settings", 3),
+            ("home", 0),
+            ("clock", 1),
+            ("search", 2),
+            ("settings", 3),
         ]
 
         for text, idx in nav_items:
-            btn = QPushButton(text)
+            from src.ui.reference_widgets import symbol
+            icon_label = QLabel()
+            symbol(icon_label, text, "#b1c8e6", 24)
+            icon_label.resize(28,28)
+            pix = QPixmap(28,28)
+            pix.fill(Qt.transparent)
+            icon_label.render(pix)
+            btn = QPushButton(["Dashboard", "Timeline", "Search", "Settings"][idx])
+            btn.setIcon(QIcon(pix))
+            btn.setIconSize(QSize(28,28))
+            btn.setMinimumHeight(62)
+            btn.setStyleSheet("font-size:18px;margin:2px 14px;padding:14px 22px;text-align:left")
             btn.setProperty("class", "nav-button")
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda checked, i=idx: self._switch_page(i))
@@ -226,6 +238,14 @@ class MainWindow(QMainWindow):
 
         sidebar_layout.addStretch()
 
+        self._dark_toggle = QPushButton("☾   Dark Mode                         ●")
+        self._dark_toggle.setCheckable(True)
+        self._dark_toggle.setChecked(True)
+        self._dark_toggle.setCursor(Qt.PointingHandCursor)
+        self._dark_toggle.setStyleSheet("background:#152232;color:#f5f6fb;border:1px solid #25364b;border-radius:24px;font-size:16px;padding:17px;margin:14px")
+        self._dark_toggle.toggled.connect(self._toggle_theme)
+        sidebar_layout.addWidget(self._dark_toggle)
+
         # Status indicator at bottom of sidebar
         status_frame = QFrame()
         status_frame.setStyleSheet(
@@ -233,15 +253,15 @@ class MainWindow(QMainWindow):
             f"border-top: 1px solid {COLORS['border']}; border-radius: 0;"
         )
         status_layout = QHBoxLayout(status_frame)
-        status_layout.setContentsMargins(14, 10, 14, 10)
+        status_layout.setContentsMargins(28, 8, 14, 62)
         status_layout.setSpacing(6)
 
-        self._status_dot = PulsingDot(COLORS["accent_secondary"], size=7)
+        self._status_dot = PulsingDot("#00ce8c", size=12)
         status_layout.addWidget(self._status_dot)
 
         self._status_label = QLabel("Monitoring active")
         self._status_label.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 11px; "
+            f"color: {COLORS['text_muted']}; font-size: 16px; "
             f"font-weight: 500; border: none;"
         )
         status_layout.addWidget(self._status_label)
@@ -271,8 +291,21 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(self._page_stack, 1)
 
+        from src.ui.window_fit import WindowFitCanvas
+        central.setStyleSheet(self.styleSheet())
+        self._fit_canvas = WindowFitCanvas(central, self)
+        self.setCentralWidget(self._fit_canvas)
+
         # Set initial page
         self._switch_page(0)
+
+    def _toggle_theme(self, dark):
+        if dark:
+            self.setStyleSheet(get_main_stylesheet())
+        else:
+            self.setStyleSheet(get_main_stylesheet() + "QMainWindow,QStackedWidget{background:#e3eaf3} #sidebar{background:#d3dfed} QPushButton.nav-button{color:#25405f}")
+
+        self._fit_canvas.content.setStyleSheet(self.styleSheet())
 
     def _setup_tray(self):
         """Setup system tray icon and menu."""
@@ -306,10 +339,11 @@ class MainWindow(QMainWindow):
         """Setup the status bar."""
         self._statusbar = QStatusBar()
         self.setStatusBar(self._statusbar)
+        self._statusbar.hide()
 
         self._event_counter_label = QLabel("Events: 0")
         self._event_counter_label.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 11px; padding: 0 8px;"
+            f"color: {COLORS['text_muted']}; font-size: 16px; padding: 0 8px;"
         )
         self._statusbar.addPermanentWidget(self._event_counter_label)
 
@@ -317,7 +351,7 @@ class MainWindow(QMainWindow):
         now_dt = datetime.now()
         self._pc_clock_label = QLabel(f"🕒 {now_dt.strftime('%I:%M:%S %p')}  •  {now_dt.strftime('%b %d')}")
         self._pc_clock_label.setStyleSheet(
-            f"color: {COLORS['accent_secondary']}; font-weight: 600; font-size: 11px; padding: 0 12px;"
+            f"color: {COLORS['accent_secondary']}; font-weight: 600; font-size: 16px; padding: 0 12px;"
         )
         self._statusbar.addPermanentWidget(self._pc_clock_label)
 
