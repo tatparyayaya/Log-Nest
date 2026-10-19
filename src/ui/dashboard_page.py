@@ -5,13 +5,15 @@ Main dashboard with statistics cards, activity chart, and recent events.
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QSizePolicy, QGridLayout
+    QScrollArea, QSizePolicy, QGridLayout, QStackedWidget,
+    QPushButton
 )
 from PySide6.QtCore import Qt, QTimer, Slot
 
 from src.database import DatabaseManager
 from src.ui.theme import COLORS
 from src.ui.widgets import StatCard, EventCard, ActivityChart, PulsingDot
+from src.ui.digital_wellbeing_page import DigitalWellbeingPage
 
 
 class DashboardPage(QWidget):
@@ -20,6 +22,7 @@ class DashboardPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.db = DatabaseManager()
+        self._current_view_idx = 0
         self._setup_ui()
 
         # Auto-refresh timer
@@ -31,40 +34,62 @@ class DashboardPage(QWidget):
         QTimer.singleShot(100, self.refresh_data)
 
     def _setup_ui(self):
-        """Build the dashboard UI."""
+        """Build the dashboard UI with segmented view switcher."""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(24, 24, 24, 24)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(16, 16, 16, 16)
+        main_layout.setSpacing(12)
 
-        # Header
+        # ─── Navigation Header with View Switcher ────────────────
         header = QHBoxLayout()
-        header.setSpacing(12)
+        header.setSpacing(16)
 
-        title = QLabel("Dashboard")
-        title.setProperty("class", "page-title")
-        title.setStyleSheet(
-            f"font-size: 24px; font-weight: bold; "
-            f"color: {COLORS['text_primary']};"
+        # Segmented view switcher: [ 🌿 Digital Wellbeing ] [ 📊 System Activity ]
+        switcher_frame = QFrame()
+        switcher_frame.setStyleSheet(
+            f"background-color: {COLORS['bg_medium']}; border: 1px solid {COLORS['border']}; "
+            f"border-radius: 8px; padding: 2px;"
         )
-        header.addWidget(title)
+        switcher_layout = QHBoxLayout(switcher_frame)
+        switcher_layout.setContentsMargins(2, 2, 2, 2)
+        switcher_layout.setSpacing(4)
+
+        self.btn_tab_wellbeing = QPushButton("🌿  Digital Wellbeing")
+        self.btn_tab_wellbeing.setCursor(Qt.PointingHandCursor)
+        self.btn_tab_wellbeing.clicked.connect(lambda: self._switch_view(0))
+        switcher_layout.addWidget(self.btn_tab_wellbeing)
+
+        self.btn_tab_activity = QPushButton("📊  System Activity")
+        self.btn_tab_activity.setCursor(Qt.PointingHandCursor)
+        self.btn_tab_activity.clicked.connect(lambda: self._switch_view(1))
+        switcher_layout.addWidget(self.btn_tab_activity)
+
+        header.addWidget(switcher_frame)
+        header.addStretch()
 
         # Live indicator
         live_container = QHBoxLayout()
         live_container.setSpacing(6)
         dot = PulsingDot(COLORS["accent_secondary"])
         live_container.addWidget(dot)
-        live_label = QLabel("LIVE")
+        live_label = QLabel("LIVE PC SYNC")
         live_label.setStyleSheet(
             f"color: {COLORS['accent_secondary']}; font-size: 11px; "
-            f"font-weight: bold; letter-spacing: 2px;"
+            f"font-weight: bold; letter-spacing: 1.5px;"
         )
         live_container.addWidget(live_label)
 
-        header.addStretch()
         header.addLayout(live_container)
         main_layout.addLayout(header)
 
-        # Scroll area for content
+        # ─── Stacked Widget (Wellbeing vs System Activity) ───────
+        self.stack = QStackedWidget()
+        self.stack.setStyleSheet("background: transparent;")
+
+        # Page 0: Digital Wellbeing
+        self.wellbeing_page = DigitalWellbeingPage()
+        self.stack.addWidget(self.wellbeing_page)
+
+        # Page 1: Original System Activity Dashboard Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -197,11 +222,47 @@ class DashboardPage(QWidget):
         scroll_layout.addStretch()
 
         scroll.setWidget(scroll_content)
-        main_layout.addWidget(scroll, 1)
+        self.stack.addWidget(scroll)
+        main_layout.addWidget(self.stack, 1)
+
+        # Default to Digital Wellbeing view
+        self._switch_view(0)
+
+    def _switch_view(self, idx: int):
+        """Switch between Digital Wellbeing and System Activity views."""
+        self._current_view_idx = idx
+        self.stack.setCurrentIndex(idx)
+
+        active_btn_style = (
+            f"QPushButton {{ background-color: {COLORS['accent_primary']}; color: white; "
+            f"border: none; border-radius: 6px; padding: 6px 16px; font-weight: 700; font-size: 13px; }}"
+        )
+        inactive_btn_style = (
+            f"QPushButton {{ background-color: transparent; color: {COLORS['text_secondary']}; "
+            f"border: none; border-radius: 6px; padding: 6px 16px; font-weight: 500; font-size: 13px; }} "
+            f"QPushButton:hover {{ color: {COLORS['text_primary']}; background-color: {COLORS['bg_lighter']}; }}"
+        )
+
+        if idx == 0:
+            self.btn_tab_wellbeing.setStyleSheet(active_btn_style)
+            self.btn_tab_activity.setStyleSheet(inactive_btn_style)
+            self.wellbeing_page.refresh_data()
+        else:
+            self.btn_tab_wellbeing.setStyleSheet(inactive_btn_style)
+            self.btn_tab_activity.setStyleSheet(active_btn_style)
+
+    def on_active_tick(self, tick_data: dict):
+        """Forward real-time tick from ScreenTimeMonitor to wellbeing view."""
+        self.wellbeing_page.on_active_tick(tick_data)
 
     @Slot()
     def refresh_data(self):
         """Refresh dashboard data from the database."""
+        try:
+            self.wellbeing_page.refresh_data()
+        except Exception:
+            pass
+
         try:
             stats = self.db.get_stats(hours=24)
 

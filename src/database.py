@@ -183,6 +183,60 @@ class DatabaseManager:
             ON app_sessions(app_id)
         """)
 
+        # Digital Wellbeing: Daily application screen time records
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS screen_time_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                app_id TEXT NOT NULL,
+                app_name TEXT NOT NULL,
+                category TEXT DEFAULT 'Other',
+                duration_seconds REAL DEFAULT 0,
+                launches INTEGER DEFAULT 0,
+                last_active TEXT,
+                UNIQUE(date, app_id)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_screen_time_date
+            ON screen_time_records(date DESC)
+        """)
+
+        # Digital Wellbeing: Hourly screen time breakdown for today's chart
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS hourly_screen_time (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                hour INTEGER NOT NULL,
+                app_id TEXT NOT NULL,
+                app_name TEXT NOT NULL,
+                duration_seconds REAL DEFAULT 0,
+                UNIQUE(date, hour, app_id)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_hourly_screen_time
+            ON hourly_screen_time(date, hour)
+        """)
+
+        # Digital Wellbeing: Application daily time limits
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS app_limits (
+                app_id TEXT PRIMARY KEY,
+                app_name TEXT NOT NULL,
+                daily_limit_minutes INTEGER NOT NULL,
+                enabled INTEGER DEFAULT 1
+            )
+        """)
+
+        # Digital Wellbeing: Settings & Focus mode
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wellbeing_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+
         conn.commit()
 
         # Run safe migration on first launch with new version
@@ -606,6 +660,205 @@ class DatabaseManager:
                     """, (new_title, clean_name, new_type, event_id))
         except Exception:
             pass
+
+    # --- Digital Wellbeing ---
+    def record_screen_time(self, app_id, app_name, category, seconds, date_str=None, hour=None):
+        """Record active screen time for an application on a given date and hour."""
+        if not app_id or seconds <= 0:
+            return
+
+        now = datetime.now()
+        if date_str is None:
+            date_str = now.strftime("%Y-%m-%d")
+        if hour is None:
+            hour = now.hour
+        now_iso = now.isoformat()
+
+        with self._cursor() as cursor:
+            # 1. Update daily aggregate
+            cursor.execute("""
+                INSERT INTO screen_time_records (date, app_id, app_name, category, duration_seconds, launches, last_active)
+                VALUES (?, ?, ?, ?, ?, 0, ?)
+                ON CONFLICT(date, app_id) DO UPDATE SET
+                    duration_seconds = duration_seconds + excluded.duration_seconds,
+                    last_active = excluded.last_active,
+                    app_name = CASE WHEN excluded.app_name != '' THEN excluded.app_name ELSE screen_time_records.app_name END,
+                    category = CASE WHEN excluded.category != 'Other' THEN excluded.category ELSE screen_time_records.category END
+            """, (date_str, app_id, app_name, category, seconds, now_iso))
+
+            # 2. Update hourly aggregate
+            cursor.execute("""
+                INSERT INTO hourly_screen_time (date, hour, app_id, app_name, duration_seconds)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(date, hour, app_id) DO UPDATE SET
+                    duration_seconds = duration_seconds + excluded.duration_seconds,
+                    app_name = CASE WHEN excluded.app_name != '' THEN excluded.app_name ELSE hourly_screen_time.app_name END
+            """, (date_str, hour, app_id, app_name, seconds))
+
+    def increment_app_launches(self, app_id, app_name, category, date_str=None):
+        """Increment the launch/open count for an application on a given date."""
+        if not app_id:
+            return
+        now = datetime.now()
+        if date_str is None:
+            date_str = now.strftime("%Y-%m-%d")
+        now_iso = now.isoformat()
+
+        with self._cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO screen_time_records (date, app_id, app_name, category, duration_seconds, launches, last_active)
+                VALUES (?, ?, ?, ?, 0, 1, ?)
+                ON CONFLICT(date, app_id) DO UPDATE SET
+                    launches = launches + 1,
+                    last_active = excluded.last_active,
+                    app_name = CASE WHEN excluded.app_name != '' THEN excluded.app_name ELSE screen_time_records.app_name END,
+                    category = CASE WHEN excluded.category != 'Other' THEN excluded.category ELSE screen_time_records.category END
+            """, (date_str, app_id, app_name, category, now_iso))
+
+    def get_daily_screen_time(self, date_str=None):
+        """
+        Get complete Digital Wellbeing summary for a specific date (defaults to today).
+        Returns total_seconds, total_launches, apps list with limits, and categories.
+        """
+        now = datetime.now()
+        if date_str is None:
+            date_str = now.strftime("%Y-%m-%d")
+
+        with self._cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    r.app_id, r.app_name, r.category, r.duration_seconds, r.launches, r.last_active,
+                    l.daily_limit_minutes, l.enabled as limit_enabled
+                FROM screen_time_records r
+                LEFT JOIN app_limits l ON r.app_id = l.app_id
+                WHERE r.date = ?
+                ORDER BY r.duration_seconds DESC
+            """, (date_str,))
+            rows = [dict(r) for r in cursor.fetchall()]
+
+            # If no screen_time_records exist for today yet, check if app_sessions can provide a bootstrap
+            if not rows and date_str == now.strftime("%Y-%m-%d"):
+                today_start = f"{date_str}T00:00:00"
+                cursor.execute("""
+                    SELECT app_id, app_name, SUM(COALESCE(duration_seconds, 60)) as duration_seconds, COUNT(*) as launches
+                    FROM app_sessions
+                    WHERE started_at >= ?
+                    GROUP BY app_id
+                    ORDER BY duration_seconds DESC
+                """, (today_start,))
+                session_rows = cursor.fetchall()
+                if session_rows:
+                    for s in session_rows:
+                        aid = s["app_id"]
+                        aname = s["app_name"]
+                        dur = float(s["duration_seconds"] or 0)
+                        lch = int(s["launches"] or 1)
+                        cursor.execute("""
+                            INSERT INTO screen_time_records (date, app_id, app_name, category, duration_seconds, launches, last_active)
+                            VALUES (?, ?, ?, 'Application', ?, ?, ?)
+                            ON CONFLICT(date, app_id) DO NOTHING
+                        """, (date_str, aid, aname, dur, lch, now.isoformat()))
+                    # Re-fetch after bootstrap
+                    cursor.execute("""
+                        SELECT 
+                            r.app_id, r.app_name, r.category, r.duration_seconds, r.launches, r.last_active,
+                            l.daily_limit_minutes, l.enabled as limit_enabled
+                        FROM screen_time_records r
+                        LEFT JOIN app_limits l ON r.app_id = l.app_id
+                        WHERE r.date = ?
+                        ORDER BY r.duration_seconds DESC
+                    """, (date_str,))
+                    rows = [dict(r) for r in cursor.fetchall()]
+
+            total_seconds = sum(r["duration_seconds"] for r in rows)
+            total_launches = sum(r["launches"] for r in rows)
+
+            # Calculate percentages
+            for r in rows:
+                r["percentage"] = (r["duration_seconds"] / total_seconds * 100.0) if total_seconds > 0 else 0.0
+
+            by_category = {}
+            for r in rows:
+                cat = r["category"] or "Other"
+                by_category[cat] = by_category.get(cat, 0.0) + r["duration_seconds"]
+
+            return {
+                "date": date_str,
+                "total_seconds": total_seconds,
+                "total_launches": total_launches,
+                "apps": rows,
+                "by_category": by_category,
+            }
+
+    def get_hourly_screen_time(self, date_str=None):
+        """Get 24-hour breakdown of screen time (in seconds) for a given date."""
+        if date_str is None:
+            date_str = datetime.now().strftime("%Y-%m-%d")
+
+        hourly_map = {h: 0.0 for h in range(24)}
+        with self._cursor() as cursor:
+            cursor.execute("""
+                SELECT hour, SUM(duration_seconds) as total_secs
+                FROM hourly_screen_time
+                WHERE date = ?
+                GROUP BY hour
+                ORDER BY hour
+            """, (date_str,))
+            for r in cursor.fetchall():
+                h = int(r["hour"])
+                if 0 <= h < 24:
+                    hourly_map[h] = float(r["total_secs"] or 0)
+
+        return hourly_map
+
+    def set_app_limit(self, app_id, app_name, daily_limit_minutes, enabled=1):
+        """Set or update a daily screen time limit for an application."""
+        with self._cursor() as cursor:
+            cursor.execute("""
+                INSERT OR REPLACE INTO app_limits (app_id, app_name, daily_limit_minutes, enabled)
+                VALUES (?, ?, ?, ?)
+            """, (app_id, app_name, daily_limit_minutes, int(enabled)))
+
+    def remove_app_limit(self, app_id):
+        """Remove a daily limit for an application."""
+        with self._cursor() as cursor:
+            cursor.execute("DELETE FROM app_limits WHERE app_id = ?", (app_id,))
+
+    def get_app_limits(self):
+        """Get all configured application limits."""
+        with self._cursor() as cursor:
+            cursor.execute("SELECT * FROM app_limits ORDER BY daily_limit_minutes ASC")
+            return [dict(r) for r in cursor.fetchall()]
+
+    def get_app_limit(self, app_id):
+        """Get daily limit for a specific application."""
+        with self._cursor() as cursor:
+            cursor.execute("SELECT * FROM app_limits WHERE app_id = ?", (app_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_wellbeing_setting(self, key, default=None):
+        """Get a digital wellbeing setting."""
+        with self._cursor() as cursor:
+            cursor.execute("SELECT value FROM wellbeing_settings WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            return row["value"] if row else default
+
+    def set_wellbeing_setting(self, key, value):
+        """Set a digital wellbeing setting."""
+        with self._cursor() as cursor:
+            cursor.execute("""
+                INSERT OR REPLACE INTO wellbeing_settings (key, value) VALUES (?, ?)
+            """, (key, str(value)))
+
+    def get_screen_time_dates(self, limit=30):
+        """Get list of distinct dates that have recorded screen time."""
+        with self._cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT date FROM screen_time_records
+                ORDER BY date DESC LIMIT ?
+            """, (limit,))
+            return [r["date"] for r in cursor.fetchall()]
 
     def export_events(self, filepath, start_date=None, end_date=None):
         """Export events to a JSON file."""

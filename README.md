@@ -17,6 +17,15 @@
 - **Windows Event Log** — Captures system errors, warnings, and crash reports from Windows Event Log
 - **Crash Detection** — Identifies application crashes via Windows Error Reporting
 
+### 🌿 Digital Wellbeing (Android-Style for Windows)
+- **Real-Time PC Clock Synchronization** — Live sync with Windows system clock and date
+- **Circular Screen Time Donut Chart** — Android-inspired ring chart showing today's screen time and app distribution
+- **Live Active Application Tracking** — Foreground window detection with real-time focus stopwatch
+- **App Usage Breakdown** — Daily screen time, launch counts, and percentage per app
+- **App Daily Limits & Timers** — Configurable daily usage caps with tray warnings and alerts
+- **Focus Mode & Bedtime Schedule** — Distraction-free focus timer and wind-down reminders
+- **Idle Screen Timeout** — Automatically pauses screen time tracking when user is idle or away
+
 ### 📊 Dashboard
 - Live statistics cards (total events, active processes, file changes, errors)
 - Hourly activity bar chart

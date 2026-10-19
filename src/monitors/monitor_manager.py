@@ -5,12 +5,14 @@ Coordinates all monitoring threads and routes events to the database.
 
 import logging
 from datetime import datetime
+from typing import Optional
 from PySide6.QtCore import QObject, Signal
 
 from src.database import DatabaseManager
 from src.monitors.process_monitor import ProcessMonitor
 from src.monitors.file_monitor import FileMonitor
 from src.monitors.system_event_monitor import SystemEventMonitor
+from src.monitors.screen_time_monitor import ScreenTimeMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +20,11 @@ logger = logging.getLogger(__name__)
 class MonitorManager(QObject):
     """Manages and coordinates all monitoring threads."""
 
-    new_event = Signal(dict)        # Emitted when any event is stored
-    monitor_error = Signal(str)     # Emitted on monitor errors
-    status_changed = Signal(str)    # Emitted when monitor status changes
+    new_event = Signal(dict)            # Emitted when any event is stored
+    monitor_error = Signal(str)         # Emitted on monitor errors
+    status_changed = Signal(str)        # Emitted when monitor status changes
+    active_screen_tick = Signal(dict)   # Emitted every second with active foreground screen time
+    daily_limit_reached = Signal(dict)  # Emitted when an app crosses daily limit
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -48,6 +52,12 @@ class MonitorManager(QObject):
         self._monitors["system"] = SystemEventMonitor(poll_interval=15.0)
         self._monitors["system"].event_detected.connect(self._on_event)
         self._monitors["system"].error_occurred.connect(self._on_error)
+
+        # Screen time & Digital Wellbeing monitor
+        self._monitors["screentime"] = ScreenTimeMonitor(idle_timeout=120.0)
+        self._monitors["screentime"].active_tick.connect(self.active_screen_tick.emit)
+        self._monitors["screentime"].daily_limit_reached.connect(self.daily_limit_reached.emit)
+        self._monitors["screentime"].error_occurred.connect(self._on_error)
 
     def start_all(self):
         """Start all monitors."""
@@ -115,10 +125,22 @@ class MonitorManager(QObject):
                     self._monitors[name].set_watched_paths(watch_list)
             elif name == "system":
                 self._monitors[name] = SystemEventMonitor(poll_interval=15.0)
+                self._monitors[name].event_detected.connect(self._on_event)
+                self._monitors[name].error_occurred.connect(self._on_error)
+            elif name == "screentime":
+                self._monitors[name] = ScreenTimeMonitor(idle_timeout=120.0)
+                self._monitors[name].active_tick.connect(self.active_screen_tick.emit)
+                self._monitors[name].daily_limit_reached.connect(self.daily_limit_reached.emit)
+                self._monitors[name].error_occurred.connect(self._on_error)
 
-            self._monitors[name].event_detected.connect(self._on_event)
-            self._monitors[name].error_occurred.connect(self._on_error)
+            if name in ("process", "file"):
+                self._monitors[name].event_detected.connect(self._on_event)
+                self._monitors[name].error_occurred.connect(self._on_error)
             self._monitors[name].start()
+
+    def get_screen_time_monitor(self) -> Optional[ScreenTimeMonitor]:
+        """Get the ScreenTimeMonitor instance."""
+        return self._monitors.get("screentime")
 
     def is_monitor_running(self, name):
         """Check if a specific monitor is running."""

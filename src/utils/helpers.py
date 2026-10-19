@@ -108,6 +108,24 @@ def format_duration(seconds):
     return f"{hours}h {mins:02d}m"
 
 
+def format_screen_time(seconds, detailed=False):
+    """Format screen time in Android Digital Wellbeing style (e.g. '2 hr 15 min', '45 min', '12 sec')."""
+    if seconds is None or seconds <= 0:
+        return "0 min" if not detailed else "0 sec"
+    seconds = int(round(seconds))
+    if seconds < 60:
+        return f"{seconds} sec" if detailed else "< 1 min"
+    mins, secs = divmod(seconds, 60)
+    if mins < 60:
+        if detailed and secs > 0:
+            return f"{mins} min {secs} sec"
+        return f"{mins} min"
+    hours, mins = divmod(mins, 60)
+    if mins == 0:
+        return f"{hours} hr"
+    return f"{hours} hr {mins} min"
+
+
 # Category icons (Unicode)
 CATEGORY_ICONS = {
     "Application": "🔷",

@@ -6,6 +6,7 @@ Primary application window with sidebar navigation and system tray support.
 import os
 import sys
 import logging
+from datetime import datetime
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QStackedWidget, QFrame,
@@ -89,6 +90,10 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_tray()
         self._setup_statusbar()
+
+        # Connect Screen Time & Digital Wellbeing signals
+        self.monitor_manager.active_screen_tick.connect(self._dashboard.on_active_tick)
+        self.monitor_manager.daily_limit_reached.connect(self._on_daily_limit_reached)
 
         # Start monitoring
         self._start_monitors_timer = QTimer(self)
@@ -308,10 +313,23 @@ class MainWindow(QMainWindow):
         )
         self._statusbar.addPermanentWidget(self._event_counter_label)
 
-        # Update counter periodically
+        # Real-time PC Clock in status bar
+        now_dt = datetime.now()
+        self._pc_clock_label = QLabel(f"🕒 {now_dt.strftime('%I:%M:%S %p')}  •  {now_dt.strftime('%b %d')}")
+        self._pc_clock_label.setStyleSheet(
+            f"color: {COLORS['accent_secondary']}; font-weight: 600; font-size: 11px; padding: 0 12px;"
+        )
+        self._statusbar.addPermanentWidget(self._pc_clock_label)
+
+        # Update counter and clock periodically
         self._counter_timer = QTimer(self)
         self._counter_timer.timeout.connect(self._update_counter)
-        self._counter_timer.start(3000)
+        self._counter_timer.start(1000)
+
+    def _update_clock(self):
+        """Update PC real-time clock label in statusbar."""
+        now_dt = datetime.now()
+        self._pc_clock_label.setText(f"🕒 {now_dt.strftime('%I:%M:%S %p')}  •  {now_dt.strftime('%b %d')}")
 
     def _switch_page(self, index):
         """Switch to a page by index."""
@@ -370,9 +388,24 @@ class MainWindow(QMainWindow):
         self._statusbar.showMessage("File monitor restarted", 3000)
 
     def _update_counter(self):
-        """Update the event counter in the status bar."""
+        """Update the event counter and PC clock in the status bar."""
         count = self.monitor_manager.get_event_count()
         self._event_counter_label.setText(f"Session events: {count}")
+        self._update_clock()
+
+    @Slot(dict)
+    def _on_daily_limit_reached(self, limit_data):
+        """Show tray notification and alert when an app reaches its daily screen time limit."""
+        app_name = limit_data.get("app_name", "Application")
+        formatted_limit = limit_data.get("formatted_limit", "")
+        formatted_used = limit_data.get("formatted_used", "")
+        self._tray.showMessage(
+            "Digital Wellbeing — Daily Limit Reached",
+            f"{app_name} reached your limit of {formatted_limit} (Used: {formatted_used}).",
+            QSystemTrayIcon.Warning,
+            6000
+        )
+        self._statusbar.showMessage(f"⚠️ Digital Wellbeing: Daily limit reached for {app_name} ({formatted_limit})", 6000)
 
     def _tray_activated(self, reason):
         """Handle tray icon activation."""

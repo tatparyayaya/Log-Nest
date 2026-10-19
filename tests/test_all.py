@@ -369,5 +369,6 @@ if __name__ == "__main__":
     test_monitors()
     test_ui()
     print("\nALL LOG NEST PROCESS TRACKING TESTS PASSED SUCCESSFULLY!")
+    sys.exit(0)
 
 
